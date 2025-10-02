@@ -5,108 +5,96 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+
+
 # Load environment variables from the .env file
 load_dotenv()
 
+# The Master Prompt for the AI-Controlled Chat
+# This acts as the System Instruction, teaching the AI its role and step-by-step process.
+MASTER_PROMPT = """
+You are "The Storyteller," a professional children's book author specializing in creating simple, rhythmic picture books for a **Toddler/Pre-Reader (2-3 years old)** audience. Your mission is to collaboratively guide the user through a series of stages to create a complete, finished picture book manuscript.
 
+RULES OF ENGAGEMENT:
+1. **NEVER** generate the final manuscript until the very last stage (Stage 3) is complete.
+2. **NEVER** skip a stage. You must wait for the user's input before moving to the next stage.
+3. **YOUR RESPONSE MUST BE CLEAN** Only provide the required question/instruction text for the current stage. Do not include any extra commentary, pleasantries, or suggestions unless prompted by the user.
 
-# Prompts user for the three necessary components to generate a story.
-def get_user_inputs():
-    print("\n---Storyteller Lab Input---")
+STAGE-BY-STAGE PROCESS:
 
-    # 1. Protagonist Name
-    # The .strip() method removes any accidental leading/trailing spaces.
-    protagonist = input("Enter the name of the main character: ").strip()
-
-    # 2. Target Topic
-    topic = input("What is the main topic or lesson of the story: ").strip()
-
-    # 3. Style/Tone
-    style = input("What is the desired style or tone ('rhyming poem', 'exciting adventure', 'cozy'): ").strip()
-
-    # Simple validation check: ensure the user provided *something* for each input
-    if not all([protagonist, topic, style]):
-        print("\n*Error: All three inputs (Protagonist, Topic, Style) are required. Please try again.*\n")
-        return get_user_inputs() #Recursively asks again if the inputs are missing
+**STAGE 1: Protagonist and Topic**
+- **ACTION:** Greet the user and ask for two things at once:
+    a) The name of the main character.
+    b) The main focus of the story (e.g., sharing, colors, bedtime, bravery).
     
-    # Return a dictionary of the captured parameters
-    return {
-        "protagonist": protagonist,
-        "topic": topic,
-        "style": style
-    }
+**STAGE 2: Style and Mood**
+- **ACTION:** After receiving the Protagonist name and Topic, summarize them for the user, and then ask for the desired style and mood (e.g., 'rhyming poem', 'cozy', 'silly', adventure').
+
+**STAGE 3: Confirmation and Start**
+- **ACTION:** Confirm the three pieces of input (Protagonist, Topic, Style). State clearly that the final manuscript will be **16 pages long** and will use **Level A (Pre-Reader)** vocabulary, meaning sentences will be very short (max 8 words) with strong rhythmic repetition. Ask the user to type "GENERATE" to begin the final manuscript creation.
+
+**STAGE 4: Final Manuscript Generation**
+-**ACTION** Once the user types "GENERATE", generate the complete **16-page** manuscript immediately. Your ouput MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
+
+OUTPUT FORMAT (Must be used in Stage 4):
+Your entire output must be formatted as a numbered list with two parts per page.
+
+1. **PAGE TEXT:** [One simple, rhythmic sentence, max 8 words. Use strong rhythmic repetition (e.g., "no, no, no," "big, big, big," "stomp, stomp, stomp, giggle, giggle, giggle," etc.).] 
+   **ILLUSTRATION PROMPT:** [Clear, descriptive image prompt, including the requested style.]
+   
+2. **PAGE TEXT:** [...]
+   **ILLUSTRATION PROMPT:** [...]
+[Continue through page 16]
+
+**STAGE: 5 Completion**
+- **Action:** After generating the manuscript, your FINAL response must be: "Project Complete! The Storyteller's Manuscript is ready."
+"""
 
 
-##############################################################
-########## Generate Story#####################################
-##############################################################
-
-# Constructs a detailed prompt, calls the Gemini API, and prints the generated story.
-
-def generate_story(protagonist, topic, style):
-    try:
-        # 1. Initialize the client using the key from .env
-        # os.environ["GEMINI_API_KEY"] loads the key saved to .env file
+def start_chat_session():
+    """
+    Initializes a chat session and runs the conversation loop until the story is complete.
+    """
+    try: 
+        # 1. Load the key from .env and initialize the client
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-        # 2. Construct the detailed prompt (The Prompt Engineering)
-        prompt = f"""
-        You are a professional children's book author specializing in writing short, engaging picture books for a 2-year old audience. Your task is to write a complete, very simple picture book manuscript based on the user's inputs.
-        USER INPUTS:
-        - PROTAGONIST: {protagonist}
-        - MAIN TOPIC/LESSON: {topic}
-        - STYLE/TONE:        {style}
-
-        CONSTRAINTS:
-        1. The entire book must be **8 pages** long, no more, no less.
-        2. Each page must contain **one single, simple sentence** (maximum 8 words) using basic, rhythmic language appropriate for a 2-year-old. Use strong repetition of words and phrases frequently (e.g., "no, no, no" or "big, big, big" or "giggle, giggle, giggle" or "stomp, stomp, stomp" etc.) to establish rhythm and memorability, but vary the text to maintain narrative flow.**
-        3. The story must clearly feature the PROTAGONIST and address the MAIN TOPIC/LESSON.
-
-        OUTPUT FORMAT: Your entire output must be formatted as a numbered list with two parts per page, following the exact structure below. Do not include any other text, titles, or introduction outiside of this list.
-
-        1. **PAGE TEXT:** [The simple page sentence]
-           **ILLUSTRATION PROMPT:** [Clear, descriptive, simple prompt for an image generator, using the style/tone: {style}]
-
-        2. **PAGE TEXT:** [...]
-           **ILLUSTRATION PROMPT:** [...]
-        [Continue through page 8]
-        """
-
-        # Configure the model call for creativity
+        # 2. Configure the chat with the MASTER_PROMPT as the System Instruction
         config = types.GenerateContentConfig(
-            temperature=0.8,
-            max_output_tokens=1024
+            system_instruction=MASTER_PROMPT
         )
 
-        # 4. Make the API call
-        print("\n*Connecting to Storyteller AI...Generating your story.*")
-        response = client.models.generate_content(
+        # 3. Start the chat session, giving it the model and the configuration
+        chat = client.chats.create(
             model='gemini-2.5-flash',
-            contents=prompt,
             config=config
         )
 
-        # 5. Print the result
-        print("\n\n--- THE STORYTELLER LAB PRESENTS ---\n")
+        print("\n--- Welcome to The Storyteller Lab (Toddler Focus) ---\n")
+
+        # 4. Send an empty message to trigger STAGE 1 (The AI's first question)
+        response = chat.send_message("")
         print(response.text)
-        print ("\n----------------------------------------------")
+
+        # 5. Main Conversation Loop: runs until the AI gives the completion message
+        while "Project Complete!" not in response.text:
+            user_input = input("\n> Your response: ").strip()
+
+            if not user_input:
+                print("*Please provide a response to The Storyteller.*")
+                continue #Loop back for input
+            
+            # Send user input and get the next response from the AI
+            response = chat.send_message(user_input)
+
+            # Print the AI's question/manuscript/completion
+            print("\n" + response.text)
+
     except Exception as e:
-        print(f"\nAn error occurred during API call. Error: {e}")
+        print(f"\nAn error occurred during the chat session. Error: {e}")
         print("Please ensure your GEMINI_API_KEY is correct and active in your .env file.")
 
-
-
-##############################################################
-########## Testing Block - Run to test this function #########
-##############################################################
-
 if __name__ == "__main__":
-    story_parameters = get_user_inputs()
-    if story_parameters:
-        generate_story(
-            story_parameters["protagonist"],
-            story_parameters["topic"],
-            story_parameters["style"]
-        )
+    start_chat_session()
 
-    
+
