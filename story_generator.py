@@ -59,7 +59,7 @@ def generate_story(protagonist, topic, style):
 
         CONSTRAINTS:
         1. The entire book must be **8 pages** long, no more, no less.
-        2. Each page must contain **one single, simple sentence** (maximum 8 words) using basic, rhythmic, and high repetiive language appropriate for a 2-year old.
+        2. Each page must contain **one single, simple sentence** (maximum 8 words) using basic, rhythmic language appropriate for a 2-year-old. Use strong repetition of words and phrases frequently (e.g., "no, no, no" or "big, big, big" or "giggle, giggle, giggle" or "stomp, stomp, stomp" etc.) to establish rhythm and memorability, but vary the text to maintain narrative flow.**
         3. The story must clearly feature the PROTAGONIST and address the MAIN TOPIC/LESSON.
 
         OUTPUT FORMAT: Your entire output must be formatted as a numbered list with two parts per page, following the exact structure below. Do not include any other text, titles, or introduction outiside of this list.
