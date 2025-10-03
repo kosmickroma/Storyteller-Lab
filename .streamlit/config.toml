@@ -1,0 +1,15 @@
+[theme]
+# A fun primary color (e.g., bright orange or turquoise)
+primaryColor="#FF6347"  # Tomato Red/Orange
+
+# A light, neutral background
+backgroundColor="#F0F8FF" # Alice Blue (very light blue)
+
+# A slightly darker sidebar/secondary background
+secondaryBackgroundColor="#E6E6FA" # Lavender (soft purple)
+
+# Text color (black for readability)
+textColor="#191970" # Midnight Blue
+
+# Font family (using a simple sans-serif that looks friendly)
+font="sans serif"

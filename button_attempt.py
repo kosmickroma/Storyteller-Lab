@@ -2,11 +2,9 @@
 
 import os
 import streamlit as st
-import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -14,15 +12,8 @@ load_dotenv()
 # Get API key from environment for easy access
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-######################################################################################
-############################ MASTER PROMPT "TODDLER" #################################
-######################################################################################
-
-
-
 # The Master Prompt for the AI-Controlled Chat
 # This acts as the System Instruction, teaching the AI its role and step-by-step process.
-
 MASTER_PROMPT = """
 You are "The Storyteller," a professional children's book author specializing in creating simple, rhythmic picture books for a **Toddler/Pre-Reader (2-3 years old)** audience. Your mission is to collaboratively guide the user through a series of stages to create a complete, finished picture book manuscript.
 
@@ -37,10 +28,7 @@ STAGE-BY-STAGE PROCESS:
 - **ACTION:** Greet the user and ask for two things at once:
     a) The name of the main character.
     b) The main focus of the story (e.g., sharing, colors, bedtime, bravery).
-
-**STAGE 1.5: Character Detail Generation (INTERNAL ONLY)**
-- **ACTION:** Immediately generate a **detailed** physical description of the Protagonist (e.g., color, size, defining features, mood). This description MUST be stored internally by you and used as a prefix for all future ILLUSTRATION PROMPTs. DO NOT show this description to the user.
-
+    
 **STAGE 2: Style and Mood**
 - **ACTION:** After receiving the Protagonist name and Topic, summarize them for the user, and then ask for the desired style and mood (e.g., 'rhyming poem', 'cozy', 'silly', adventure').
 
@@ -54,7 +42,7 @@ OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
 
 1. **PAGE TEXT:** [One simple, rhythmic sentence, max 8 words. Use strong rhythmic repetition (e.g., "no, no, no," "big, big, big," "stomp, stomp, stomp, giggle, giggle, giggle," etc.).] 
-    **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist for consistency, followed by the scene description and requested style.]
+    **ILLUSTRATION PROMPT:** [Clear, descriptive image prompt, including the requested style.]
     
 2. **PAGE TEXT:** [...]
     **ILLUSTRATION PROMPT:** [...]
@@ -63,12 +51,6 @@ Your entire output must be formatted as a numbered list with two parts per page.
 **STAGE: 5 Completion**
 - **Action:** After generating the manuscript, your FINAL response must be: "Project Complete! The Storyteller's Manuscript is ready."
 """
-
-# --- GLOBAL STYLE SETTINGS FOR IMAGE GENERATION ---
-GLOBAL_IMAGE_STYLE = "children's book illustration, vintage style cartoon, 80s and 90s aesthetic, soft pastel colors, dreamy lighting, crayon texture, grainy texture, soft fuzzy lines, simple shapes, whimsical, fantastical, professional digital painting"
-# --- END GLOBAL SETTINGS ---
-
-
 
 
 ##########################################################################
@@ -119,90 +101,12 @@ def is_ready_to_generate():
 ############################ Streamlit Application Core ##########################
 ##################################################################################
 
-# Function to generate an image from a prompt
-def generate_image_for_page(client, prompt: str, page_number: int):
-    """
-    Generates an image using the Gemini/Imagen model and caches it in session state.
-    Returns the generated image object.
-    """
-
-    # Create a unique key for caching this specific image prompt
-    cache_key = f"image_page_{page_number}"
-
-    # 1. Check if the image is already cached
-    if cache_key in st.session_state:
-        return st.session_state[cache_key]
-
-    st.toast(f"🎨 Generating image for Page {page_number}...")
-
-    try: 
-        # 2. Call the image generation
-        # We use a reliable, high-quality model for this task
-        result = client.models.generate_images(
-            model='imagen-3.0-generate-002',
-            prompt=prompt,
-            config=dict(
-                number_of_images=1,
-                output_mime_type="image/jpeg",
-                aspect_ratio="1:1" # Standard square for a picture book
-            )
-        )
-        
-
-        # 3. Extract the image object
-        if result.generated_images:
-            image_data = result.generated_images[0]
-            # Save the image data directly to cache_key to avoid re-generation
-            st.session_state[cache_key] = image_data
-            return image_data
-        
-    except Exception as e:
-        error_message = str(e)
-        st.error(f"❌ Image generation failed for Page {page_number}. Error: {error_message[:100]}...")
-        # Return None or a placeholder if generation fails
-        return None
-    
-# Parse Manuscript
-def parse_manuscript (full_text: str):
-    """
-    Parses the full 16-page manuscript string into a list of dictionaries,
-    where each dictionary contains 'page_text' and 'image_prompt'.
-    """
-
-    pages = []
-    # Split the text by the page numbering ("1.", "2.", etc.)
-    # We use regex to handle any variation in spacing after the number.
-    segments = re.split(r'\s*\d+\.\s*', full_text)
-
-    # The first segment will be empty or a title, so we start from the second element.
-    for segment in segments[1:]:
-        # Split each segment into PAGE TEXT and ILLUSTRATION PROMPT
-        if "ILLUSTRATION PROMPT:" in segment:
-            parts = segment.split("ILLUSTRATION PROMPT:", 1)
-            page_text = parts[0].strip()
-            # Capture the description content from the Gemini output
-            illustration_content = parts[1].strip()
-
-            # COMBINE: Prepend the global style to the contextual description
-            final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {illustration_content}"
-
-            pages.append({
-                "page_text": page_text,
-                "image_prompt": final_image_prompt,
-                "generated": False # Flag to track image generation status
-            })
-    return pages
-
-#########################################################################################################
-############################ MAIN #######################################################################
-#########################################################################################################
 def main():
-
 
     # --- SUCCESS MESSAGE CHECK (FOR AUTO-SCROLL RETURN) ---
     if 'story_complete' in st.session_state and st.session_state.story_complete:
         st.success("✅ Manuscript is Ready! Scroll down to the end of the conversation to see the full story.")
-        #st.session_state.story_complete = False # Reset the flag
+        st.session_state.story_complete = False # Reset the flag
 
     # ### --- REMOVED: input_placeholder is gone! --- ###
 
@@ -238,52 +142,6 @@ def main():
     # --- CHAT HISTORY DISPLAY ---
     display_history()
 
-    # Check if the final manuscript is complete and ready to display 
-    if 'parsed_pages' in st.session_state and st.session_state.story_complete:
-
-        # 1. Display the Header
-        st.subheader("Storyteller Lab Presents:")
-        st.title(st.session_state.story_header)
-        st.divider()
-
-        client = get_gemini_client(GEMINI_API_KEY) # Retrieve the client
-
-        # 2. Loop through each page for text and image generation/display
-        for i, page in enumerate(st.session_state.parsed_pages):
-            page_number = i + 1
-
-            # Use st.container() to visually seperate each page
-            with st.container(border=True):
-                st.markdown(f"**Page {page_number}**")
-
-                # Create two columns for the text (left) and image (right)
-                col1, col2 = st.columns([1,1])
-
-                # LEFT COLUMN: Display the text
-                with col1:
-                    st.markdown(f"**{page['page_text']}**")
-
-                # RIGHT COLUMN: Generate and display the image
-                with col2:
-                    # Check if image is already generated/cached
-                    if f"image_page_{page_number}" not in st.session_state:
-                        # Only generate if the image is not already in the session state
-                        with st.spinner(f"Generating image for Page {page_number}..."):
-                            # The generate_image_for_page function will save it to session_state
-                            generate_image_for_page(client, page['image_prompt'], page_number)
-
-                    # Display the image once it exists (either freshly generated or cached)
-                    if f"image_page_{page_number}" in st.session_state:
-                        image_data = st.session_state[f"image_page_{page_number}"]
-                        # The client gives us image data, which Streamlit can display
-                        st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
-
-                    else: 
-                        st.warning ("Image generation failed for this page.")
-            st.markdown ("---") # Visual separator between pages
-
-        # Stop execution here to avoid displaying the chat input placeholder on the final screen
-        return
 
     # --- USER INPUT HANDLER (Uses the stable st.chat_input) ---
     
@@ -328,30 +186,6 @@ def main():
                 if "Project Complete!" in ai_response:
                     st.session_state.story_complete = True # Set flag for success message
                 
-                    # Project Complete
-                    # 1. Store the raw manuscipt text
-                    raw_manuscript = ai_response.replace("Project Complete! The Storyteller's Manuscript is ready.", "").strip()
-                    st.session_state.raw_manuscript = raw_manuscript
-
-                    # 2. Immediately parse and store the page data
-                    st.session_state.parsed_pages = parse_manuscript(raw_manuscript)
-
-                    # 3. Save the title/topic from the first message for the header
-                    # Find the last assistant message that is NOT the final output
-                    # This is simple, as the penultimate message is the stage 3 summary.
-                    summary_text = st.session_state.messages[-2]['content']
-
-                    # We can use simple parsing (will refine if needed, but this works for now)
-                    if "Protagonist:" in summary_text:
-                        protagonist = summary_text.split("Protagonist:")[1].split(".")[0].strip()
-                        topic = summary_text.split("Topic:")[1].split(".")[0].strip()
-                        st.session_state.story_header = f"A story about {protagonist} and {topic}"
-                    else: 
-                        st.session_state.story_header = "A Completed Manuscript"
-
-                    st.rerun()
-
-
             except Exception as e:
                 # Error handling
                 error_message = str(e)
@@ -366,8 +200,7 @@ def main():
                 st.session_state.messages.pop()
         
         # 7. Final rerun to update the display (shows both user message and AI response)
-        if not st.session_state.get('story_complete'):
-            st.rerun()
+        st.rerun() 
 
 # Run the main function
 if __name__ == "__main__":
