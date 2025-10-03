@@ -53,7 +53,7 @@ STAGE-BY-STAGE PROCESS:
 OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
 
-1. **PAGE TEXT:** [One simple, rhythmic sentence, max 8 words. Use strong rhythmic repetition (e.g., "no, no, no," "big, big, big," "stomp, stomp, stomp, giggle, giggle, giggle," etc.).] 
+1. **PAGE TEXT:** [One simple sentence, max 10 words. Use gentle rhythm and occasional rhyming. Examples: "Max runs fast, runs past the tall grass", "Up the hill, down the hill, what a thrill!", "The moon is bright, goodnight, sleep tight tonight". Keep it playful and musical, but natural-sounding.] 
     **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist for consistency, followed by the scene description and requested style.]
     
 2. **PAGE TEXT:** [...]
@@ -307,7 +307,14 @@ def main():
 
                     # LEFT COLUMN: Display the text
                     with col1:
-                        st.markdown(f"**{page['page_text']}**")
+                        st.markdown(
+                            f"""
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100%; text-align: center;">
+                                <p style="font-size: 2em; font-weight: bold; line-height: 1.4;">{page['page_text']}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
                     # RIGHT COLUMN: Generate and display the image
                     with col2:
