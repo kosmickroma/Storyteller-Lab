@@ -48,7 +48,7 @@ STAGE-BY-STAGE PROCESS:
 - **ACTION:** Confirm the three pieces of input (Protagonist, Topic, Style). State clearly that the final manuscript will be **16 pages long** and will use **Level A (Pre-Reader)** vocabulary, meaning sentences will be very short (max 8 words) with strong rhythmic repetition. Ask the user to confirm these details are correct, and state that when they are ready, they should **type 'START STORY'** to begin the final manuscript creation.
  
 **STAGE 4: Final Manuscript Generation**
--**ACTION** Once the user types "START STORY", generate the complete **16-page** manuscript immediately. Your ouput MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
+-**ACTION** Once the user types "GENERATE", generate the complete **16-page** manuscript immediately. Your ouput MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
 
 OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
@@ -66,6 +66,8 @@ Your entire output must be formatted as a numbered list with two parts per page.
 
 # --- GLOBAL STYLE SETTINGS FOR IMAGE GENERATION ---
 GLOBAL_IMAGE_STYLE = "children's book illustration, vintage style cartoon, 80s and 90s aesthetic, soft pastel colors, dreamy lighting, crayon texture, grainy texture, soft fuzzy lines, simple shapes, whimsical, fantastical, professional digital painting"
+# --- END GLOBAL SETTINGS ---
+
 
 
 
@@ -158,9 +160,6 @@ def generate_image_for_page(client, prompt: str, page_number: int):
         error_message = str(e)
         st.error(f"❌ Image generation failed for Page {page_number}. Error: {error_message[:100]}...")
         # Return None or a placeholder if generation fails
-        # Cache the faliure status to prevent retrying on every rerun
-        st.session_state[cache_key] = 'FAILED'
-        
         return None
     
 # Parse Manuscript
@@ -197,48 +196,22 @@ def parse_manuscript (full_text: str):
 #########################################################################################################
 ############################ MAIN #######################################################################
 #########################################################################################################
-
-
 def main():
+
 
     # --- SUCCESS MESSAGE CHECK (FOR AUTO-SCROLL RETURN) ---
     if 'story_complete' in st.session_state and st.session_state.story_complete:
         st.success("✅ Manuscript is Ready! Scroll down to the end of the conversation to see the full story.")
         #st.session_state.story_complete = False # Reset the flag
-    # Initialize a flag to prevent double-submission
-    if 'processing_user_input' not in st.session_state:
-        st.session_state.processing_user_input = False
+
     # ### --- REMOVED: input_placeholder is gone! --- ###
+
 
     # --- DESIGN (Apply a clear header and separation) --- 
     with st.container():
-        # Custom Centered Title Code
-        st.markdown(
-            """
-            <style>
-            .center-text {
-                text-align: center;
-            }
-            .main-title {
-                font-size: 3em; /*Larger size for the main title */
-                margin-bottom: -0.1em; /* Pulls the subtitle closer to the main title */
-            }
-            .sub-title {
-                font-size: 1.8em; /* Subtitle size */
-                font-weight: 300; /* Lighter font weight for the subtitle */
-            }
-            </style>
-            <div class="center-text">
-                <h1 class="main-title">✨ STORY TELLER LAB ✨</h1>
-                <h2 class="sub-title">🧸 Toddler Edition 🌙</h2>
-                <p style="font-size: 1.4em; margin-top: -1.0em; font-weight: 300;">Ages 2-3</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.divider()
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.title("📚 The Storyteller Lab (Toddler Focus) ✏️")
+        st.divider() # Horizontal line
+        st.markdown("<br><br>", unsafe_allow_html=True) 
 
     # --- SESSION STATE SETUP ---
     if "gemini_chat" not in st.session_state:
@@ -302,14 +275,12 @@ def main():
                     # Display the image once it exists (either freshly generated or cached)
                     if f"image_page_{page_number}" in st.session_state:
                         image_data = st.session_state[f"image_page_{page_number}"]
-                        if image_data == 'FAILED':
-                            st.warning("Image generation failed for this page.")
                         # The client gives us image data, which Streamlit can display
                         st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
 
                     else: 
                         st.warning ("Image generation failed for this page.")
-                        st.markdown ("---") # Visual separator between pages
+            st.markdown ("---") # Visual separator between pages
 
         # Stop execution here to avoid displaying the chat input placeholder on the final screen
         return
@@ -329,16 +300,12 @@ def main():
         
     # 2. Get input from the fixed-position chat bar
     if user_input := st.chat_input(input_label):
-        # Check lock status and acquire lock immediately
-        if st.session_state.processing_user_input:
-            return
         
         prompt = user_input
         
         # Check for the GENERATE command
         if ready_to_generate and prompt.upper() == "START STORY":
-            pass
-
+            prompt = "GENERATE"
         elif ready_to_generate and prompt.upper() != "START STORY":
             # If user types anything but GENERATE when prompted, ignore and stop here
             return
@@ -373,20 +340,17 @@ def main():
                     # Find the last assistant message that is NOT the final output
                     # This is simple, as the penultimate message is the stage 3 summary.
                     summary_text = st.session_state.messages[-2]['content']
-                    
-                    # Use Regex to robustly capture the protagonist and topic names
-                    protagonist_match = re.search(r"Protagonist:\s*([^\n\.,;]+)", summary_text)
-                    topic_match = re.search(r"Topic:\s*([^\n\.,;]+)", summary_text)
 
                     # We can use simple parsing (will refine if needed, but this works for now)
-                    if protagonist_match and topic_match:
-                        # Group 1 (index 1) of the match is the text inside the capturing group()
-                        protagonist = protagonist_match.group(1).strip()
-                        topic = topic_match.group(1).strip()
-
+                    if "Protagonist:" in summary_text:
+                        protagonist = summary_text.split("Protagonist:")[1].split(".")[0].strip()
+                        topic = summary_text.split("Topic:")[1].split(".")[0].strip()
                         st.session_state.story_header = f"A story about {protagonist} and {topic}"
-                    else:
+                    else: 
                         st.session_state.story_header = "A Completed Manuscript"
+
+                    st.rerun()
+
 
             except Exception as e:
                 # Error handling
