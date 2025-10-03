@@ -53,7 +53,7 @@ STAGE-BY-STAGE PROCESS:
 OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
 
-1. **PAGE TEXT:** [One simple sentence, max 10 words. Use gentle rhythm and occasional rhyming. Examples: "Max runs fast, runs past the tall grass", "Up the hill, down the hill, what a thrill!", "The moon is bright, goodnight, sleep tight tonight". Keep it playful and musical, but natural-sounding.] 
+1. **PAGE TEXT:** [One simple sentence, max 10 words. Use a strong, consistent **AABB rhyming structure** (page 1 rhymes with page 2, page 3 with page 4, etc.). Maintain a bold, bouncy, and rhythmic meter reminiscent of **Dr. Seuss**. Example: "Little Lola loves to leap high. She jumps and plays beneath the blue sky."] 
     **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist for consistency, followed by the scene description and requested style.]
     
 2. **PAGE TEXT:** [...]
@@ -180,7 +180,7 @@ def parse_manuscript (full_text: str):
         # Split each segment into PAGE TEXT and ILLUSTRATION PROMPT
         if "ILLUSTRATION PROMPT:" in segment:
             parts = segment.split("ILLUSTRATION PROMPT:", 1)
-            page_text = parts[0].strip()
+            page_text = parts[0].replace("PAGE TEXT:", "").replace('*', '').strip()
             # Capture the description content from the Gemini output
             illustration_content = parts[1].strip()
 
@@ -428,7 +428,6 @@ def main():
                 st.session_state.messages.pop()
         
         # 7. Final rerun to update the display (shows both user message and AI response)
-        if not st.session_state.get('story_complete'):
             st.rerun()
 
 # Run the main function
