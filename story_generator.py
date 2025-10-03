@@ -247,72 +247,85 @@ def main():
         st.session_state.chat_initiated = False 
 
     # --- CHAT INITIATION LOGIC: Show start button if chat hasn't begun ---
+    # This block handles the initial screen and forces an exit (return) once the button is clicked or if the chat hasn't started yet.
     if not st.session_state.chat_initiated:
-        if st.button("Start New Story Conversation", type="primary"):
-            st.session_state.chat_initiated = True
-            
-            # Call API to get Stage 1 response
-            with st.spinner("Initializing The Storyteller..."):
-                first_response = st.session_state.gemini_chat.send_message("") 
-            
-            st.session_state.messages.append({"role": "assistant", "content": first_response.text})
-            st.rerun() 
 
+        # Check for button click FIRST, before creating columns
+        button_clicked = False
+        
+        # Three equal-width columns to center the button
+        with st.container():
+            col1, col2, col3 = st.columns([1,1,1])
+            with col2: # Button in the middle column (col2)
+                if st.button("Start New Story Conversation", type="primary", key="start_button"):
+                    button_clicked = True
+            
+        # Handle the button click AFTER the columns context
+        if button_clicked:
+                st.session_state.chat_initiated = True
+
+                # Call API to get Stage 1 response
+                with st.spinner("Initializing The Storyteller..."):
+                    first_response = st.session_state.gemini_chat.send_message("") 
+            
+                st.session_state.messages.append({"role": "assistant", "content": first_response.text})
+                st.rerun()
+                
+                 
+        return   
+        
+        # --- CHAT HISTORY DISPLAY ---
+    if st.session_state.chat_initiated:
         display_history()
-        return # STOP execution here if we are waiting for the button to be pressed
 
+        # Check if the final manuscript is complete and ready to display 
+        if 'parsed_pages' in st.session_state and st.session_state.story_complete:
 
-    # --- CHAT HISTORY DISPLAY ---
-    display_history()
+            # 1. Display the Header
+            st.subheader("Storyteller Lab Presents:")
+            st.title(st.session_state.story_header)
+            st.divider()
 
-    # Check if the final manuscript is complete and ready to display 
-    if 'parsed_pages' in st.session_state and st.session_state.story_complete:
+            client = get_gemini_client(GEMINI_API_KEY) # Retrieve the client
 
-        # 1. Display the Header
-        st.subheader("Storyteller Lab Presents:")
-        st.title(st.session_state.story_header)
-        st.divider()
+            # 2. Loop through each page for text and image generation/display
+            for i, page in enumerate(st.session_state.parsed_pages):
+                page_number = i + 1
 
-        client = get_gemini_client(GEMINI_API_KEY) # Retrieve the client
+                # Use st.container() to visually seperate each page
+                with st.container(border=True):
+                    st.markdown(f"**Page {page_number}**")
 
-        # 2. Loop through each page for text and image generation/display
-        for i, page in enumerate(st.session_state.parsed_pages):
-            page_number = i + 1
+                    # Create two columns for the text (left) and image (right)
+                    col1, col2 = st.columns([1,1])
 
-            # Use st.container() to visually seperate each page
-            with st.container(border=True):
-                st.markdown(f"**Page {page_number}**")
+                    # LEFT COLUMN: Display the text
+                    with col1:
+                        st.markdown(f"**{page['page_text']}**")
 
-                # Create two columns for the text (left) and image (right)
-                col1, col2 = st.columns([1,1])
+                    # RIGHT COLUMN: Generate and display the image
+                    with col2:
+                        # Check if image is already generated/cached
+                        if f"image_page_{page_number}" not in st.session_state:
+                            # Only generate if the image is not already in the session state
+                            with st.spinner(f"Generating image for Page {page_number}..."):
+                                # The generate_image_for_page function will save it to session_state
+                                generate_image_for_page(client, page['image_prompt'], page_number)
 
-                # LEFT COLUMN: Display the text
-                with col1:
-                    st.markdown(f"**{page['page_text']}**")
+                        # Display the image once it exists (either freshly generated or cached)
+                        if f"image_page_{page_number}" in st.session_state:
+                            image_data = st.session_state[f"image_page_{page_number}"]
+                            if image_data == 'FAILED':
+                                st.warning("Image generation failed for this page.")
+                            # The client gives us image data, which Streamlit can display
+                            st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
 
-                # RIGHT COLUMN: Generate and display the image
-                with col2:
-                    # Check if image is already generated/cached
-                    if f"image_page_{page_number}" not in st.session_state:
-                        # Only generate if the image is not already in the session state
-                        with st.spinner(f"Generating image for Page {page_number}..."):
-                            # The generate_image_for_page function will save it to session_state
-                            generate_image_for_page(client, page['image_prompt'], page_number)
+                        else: 
+                            st.warning ("Image generation failed for this page.")
+                            st.markdown ("---") # Visual separator between pages
 
-                    # Display the image once it exists (either freshly generated or cached)
-                    if f"image_page_{page_number}" in st.session_state:
-                        image_data = st.session_state[f"image_page_{page_number}"]
-                        if image_data == 'FAILED':
-                            st.warning("Image generation failed for this page.")
-                        # The client gives us image data, which Streamlit can display
-                        st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
-
-                    else: 
-                        st.warning ("Image generation failed for this page.")
-                        st.markdown ("---") # Visual separator between pages
-
-        # Stop execution here to avoid displaying the chat input placeholder on the final screen
-        return
+            # Stop execution here to avoid displaying the chat input placeholder on the final screen
+            return
 
     # --- USER INPUT HANDLER (Uses the stable st.chat_input) ---
     
