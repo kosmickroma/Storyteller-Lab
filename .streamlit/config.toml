@@ -1,9 +1,9 @@
 [theme]
-# A fun primary color (e.g., bright orange or turquoise)
-primaryColor="#FF6347"  # Tomato Red/Orange
+# A Primary color (Teal from Logo)
+primaryColor="#5B8A9E"  # Teal from logo
 
 # A light, neutral background
-backgroundColor="#F0F8FF" # Alice Blue (very light blue)
+backgroundColor="#FFF8F0" # Soft Cream
 
 # A slightly darker sidebar/secondary background
 secondaryBackgroundColor="#E6E6FA" # Lavender (soft purple)
