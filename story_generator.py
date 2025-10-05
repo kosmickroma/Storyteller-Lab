@@ -295,6 +295,9 @@ def main():
         # Check for button click FIRST, before creating columns
         button_clicked = False
         
+        # Tip for better consistency
+        st.info("💡 **Tip for best results:** Stories with repetitve structures (counting, colors, daily routines, alphabet) produce more visually consistent illustrations than complex narratives.")
+
         # Three equal-width columns to center the button
         with st.container():
             col1, col2, col3 = st.columns([1,1,1])
@@ -369,6 +372,9 @@ def main():
 
                 st.divider()
 
+            # Info message directing users to the generate button 
+            st.info("👇 Read your story below, then generate full illustrations or start over. (Limit: One full generation per 24 hours) ")
+
             # 2. Loop through each page for text and image generation/display
             for i, page in enumerate(st.session_state.parsed_pages):
                 page_number = i + 1
@@ -377,8 +383,16 @@ def main():
                 with st.container(border=True):
                     st.markdown(f"**Page {page_number}**")
 
+                    # --- Check if we should generate images --- #
+                    should_generate_images = st.session_state.get('generate_images', False)
+
                     # Create two columns for the text (left) and image (right)
-                    col1, col2 = st.columns([1,1])
+                    if should_generate_images:
+                        col1, col2 = st.columns([1,1])
+
+                    else:
+                        col1 = st.container()
+                        col2 = None
 
                     # LEFT COLUMN: Display the text
                     with col1:
@@ -391,31 +405,52 @@ def main():
                             unsafe_allow_html=True
                         )
 
-                    # RIGHT COLUMN: Generate and display the image
-                    with col2:
-                        # Check if image is already generated/cached
-                        if f"image_page_{page_number}" not in st.session_state:
-                            # Only generate if the image is not already in the session state
-                            with st.spinner(f"Generating image for Page {page_number}..."):
-                                # The generate_image_for_page function will save it to session_state
-                                generate_image_for_page(client, page['image_prompt'], page_number)
+                    if should_generate_images and col2 is not None:
+                    # RIGHT COLUMN: Generate and display the image 
+                        with col2:
+                            # Check if image is already generated/cached
+                            if f"image_page_{page_number}" not in st.session_state:
+                                # Only generate if the image is not already in the session state
+                                with st.spinner(f"Generating image for Page {page_number}..."):
+                                    # The generate_image_for_page function will save it to session_state
+                                    generate_image_for_page(client, page['image_prompt'], page_number)
 
-                        # Display the image once it exists (either freshly generated or cached)
-                        if f"image_page_{page_number}" in st.session_state:
-                            image_data = st.session_state[f"image_page_{page_number}"]
-                            if image_data == 'FAILED':
+                            # Display the image once it exists (either freshly generated or cached)
+                            if f"image_page_{page_number}" in st.session_state:
+                                image_data = st.session_state[f"image_page_{page_number}"]
+                                if image_data == 'FAILED':
+                                    st.warning("Image generation failed for this page.")
+                                else:
+                                    st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
+
+                            else: 
                                 st.warning("Image generation failed for this page.")
-                            # The client gives us image data, which Streamlit can display
-                            st.image(image_data.image.image_bytes, caption=f"Illustration for Page {page_number}")
 
-                        else: 
-                            st.warning ("Image generation failed for this page.")
-                            st.markdown ("---") # Visual separator between pages
-            # --- Reset Button --- #
+            # --- Action Buttons --- #
             st.divider()
-            col1, col2, col3 = st.columns([1,1,1])
+
+            # Disclaimer about image generation
+            st.info("ℹ️ Image generation uses AI and may occasionally produce visual inconsistencies. Characters and details should be similar across pages but may not be perfectly identical.")
+
+            # Create THREE columns to center the two buttons
+            col1, col2, col3 = st.columns([1, 2, 1])
+
+            # MIDDLE COLUMN: Both buttons centered 
             with col2:
-                if st.button("🔃 Start New Story", type="primary", key="reset_button"):
+                # Check if images have been generated
+                if not st.session_state.get('generate_images', False):
+                    # Button to trigger image generation
+                    if st.button("🌙 Generate Full Illustrated Book 🧸", type="primary", key="generate_book_button", use_container_width=True):
+                        # SET the flag to True
+                        st.session_state.generate_images = True
+                        #RERUN to trigger image generation
+                        st.rerun()
+
+                # Small spacing between buttons
+                st.write("")
+
+                # Reset button (always available)
+                if st.button("🔃 Start New Story", type="secondary", key="reset_button", use_container_width=True):
                     # Clear all session state
                     for key in list(st.session_state.keys()):
                         del st.session_state[key]
@@ -423,7 +458,7 @@ def main():
             # Stop execution here to avoid displaying the chat input placeholder on the final screen
             return
 
-    # --- USER INPUT HANDLER (Uses the stable st.chat_input) ---
+            # --- USER INPUT HANDLER (Uses the stable st.chat_input) ---
     
     # 1. Determine prompt label and GENERATE check
     last_message = st.session_state.messages[-1]["content"] if st.session_state.messages else ""
