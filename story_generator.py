@@ -54,7 +54,7 @@ OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
 
 1. **PAGE TEXT:** [One simple sentence, max 10 words. Use a strong, consistent **AABB rhyming structure** (page 1 rhymes with page 2, page 3 with page 4, etc.). Maintain a bold, bouncy, and rhythmic meter reminiscent of **Dr. Seuss**. Example: "Little Lola loves to leap high. She jumps and plays beneath the blue sky."] 
-    **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist for consistency, followed by the scene description and requested style.]
+    **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist AND any recurring props/objects/secondary characters (specify exact colors, patterns, sizes, species, features) for consistency, followed by the scene description and requested style.]
     
 2. **PAGE TEXT:** [...]
     **ILLUSTRATION PROMPT:** [...]
@@ -185,7 +185,12 @@ def parse_manuscript (full_text: str):
             illustration_content = parts[1].strip()
 
             # COMBINE: Prepend the global style to the contextual description
-            final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {illustration_content}"
+            if 'protagonist_description' in st.session_state:
+                character_desc = st.session_state.protagonist_description
+                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {character_desc}, {illustration_content}"
+            else:
+                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {illustration_content}"
+
 
             pages.append({
                 "page_text": page_text,
