@@ -7,18 +7,57 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-
 # Load environment variables from the .env file
 load_dotenv()
 
 # Get API key from environment for easy access
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+# ------ RATE LIMITING HELPER FUNCTIONS ------ #
+# These functions manage the 24-hour generation cooldown using browser localstorage
+def check_generation_cooldown():
+    """
+    Checks if 24 hours have passed since the last generation.
+    Returns: (can_generate: bool, hours_remaining: float)
+    
+    HOW IT WORKS:
+    - Reads ' last_generation_time' from session_state (which syncs with localStorage via JavaScript)
+    - Compares it to current time
+    - Returns True if 24+ hours passed, False otherwise
+    """
+    # EXPLANATION: We'll store the timestamp in session_state, which Streamlit manages
+    # The timestamp gets written to localStorage via JavaScript 
+
+    if 'last_generation_time' not in st.session_state:
+        # No previous generation found, user can generate
+        return True, 0
+    
+    # IMPORT: We need datetime to work with timestamps
+    from datetime import datetime, timedelta
+
+    # GET: The stored timestamp (format: "2025-10-07 14:30:00")
+    last_time_str = st.session_state.last_generation_time
+
+    # CONVERT: String timestamp back into a datetime object we can do math with
+    last_time = datetime.strptime(last_time_str, "%Y-%m-%d %H:%M:%S")
+
+    # CALCULATE: How much time has passed since last generation
+    time_passed = datetime.now() - last_time
+
+    # CHECK: Has 24 hours (1 day) passed?
+    if time_passed >= timedelta(hours=24):
+        # YES: Cooldown is over, user can generate again
+        return True, 0
+    else:
+        # NO: Still in cooldown, calculate remaining time
+        time_remaining = timedelta(hours=24) - time_passed
+        hours_remaining = time_remaining.total_seconds() / 3600 # Convert to hours
+        return False, hours_remaining
+    
+
 ######################################################################################
 ############################ MASTER PROMPT "TODDLER" #################################
 ######################################################################################
-
-
 
 # The Master Prompt for the AI-Controlled Chat
 # This acts as the System Instruction, teaching the AI its role and step-by-step process.
@@ -38,15 +77,19 @@ STAGE-BY-STAGE PROCESS:
     a) The name of the main character.
     b) The main focus of the story (e.g., sharing, colors, bedtime, bravery).
 
-**STAGE 1.5: Character Detail Generation**
-- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, immediately generate a **detailed** physical description of the Protagonist (e.g., specific colors, size, defining features, clothing, mood, unique characteristics). Present it to the user in this EXACT format on its own line: "CHARACTER DETAILS: [your detailed description here]". This description MUST be used as a prefix for all future ILLUSTRATION PROMPTS to maintain visual consistency.
+**STAGE 1.5: Character Detail Generation (Silent)**
+- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, immediately and silently generate a **detailed** physical description of the Protagonist (e.g., specific colors, size, defining features, clothing, mood, unique characteristics). **DO NOT show this to the user.** Instead, store it internally and present it in this EXACT format on its own line for your internal use: "CHARACTER DETAILS: [your detailed description here]". This description MUST be used as a prefix for all future ILLUSTRATION PROMPTS to maintain visual consistency. After generating these details silently, immediately proceed to Stage 2 without waiting for user input.
 
 **STAGE 2: Style and Mood**
 - **ACTION:** After receiving the Protagonist name and Topic, summarize them for the user, and then ask for the desired style and mood (e.g., 'rhyming poem', 'cozy', 'silly', adventure').
 
 **STAGE 3: Confirmation and Start**
-- **ACTION:** Confirm the three pieces of input (Protagonist, Topic, Style). Then create a short, catchy children's book title (3-5 words maximum) and present it in this EXACT format on its own line: "BOOK TITLE: [Your Title Here]". State clearly that the final manuscript will be **16 pages long** and will use **Level A (Pre-Reader)** vocabulary, meaning sentences will be very short (max 8 words) with strong rhythmic repetition. Ask the user to confirm these details are correct, and state that when they are ready, they should **type 'START STORY'** to begin the final manuscript creation.
- 
+- **ACTION:** Confirm the three pieces of input (Protagonist, Topic, Style). 
+
+**CRITICAL INSTRUCTION:** The Style and Mood from Stage 2 are ONLY instructions for your writing approach (tone, pacing, feel). Do NOT use style/mood words like "cozy", "silly", or "adventure" in the book title or story text unless the user's original Topic specifically included those words. The title must come from the Protagonist and Topic only.
+
+Then create a short, catchy children's book title (3-5 words maximum) and present it in this EXACT format on its own line: "BOOK TITLE: [Your Title Here]". State clearly that the final manuscript will be **16 pages long** and will use **Level A (Pre-Reader)** vocabulary, meaning sentences will be very short (max 8 words) with strong rhythmic repetition. Ask the user to confirm these details are correct, and state that when they are ready, they should **type 'START STORY'** to begin the final manuscript creation.
+
 **STAGE 4: Final Manuscript Generation**
 -**ACTION** Once the user types "START STORY", generate the complete **16-page** manuscript immediately. Your ouput MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
 
@@ -440,26 +483,55 @@ def main():
             # Create THREE columns to center the two buttons
             col1, col2, col3 = st.columns([1, 2, 1])
 
-            # MIDDLE COLUMN: Both buttons centered 
+            # MIDDLE COLUMN: Both buttons centered
             with col2:
                 # Check if images have been generated
                 if not st.session_state.get('generate_images', False):
-                    # Button to trigger image generation
-                    if st.button("🌙 Generate Full Illustrated Book 🧸", type="primary", key="generate_book_button", use_container_width=True):
-                        # SET the flag to True
-                        st.session_state.generate_images = True
-                        #RERUN to trigger image generation
-                        st.rerun()
+                    
+                    # ------ CHECK RATE LIMIT BEFORE SHOWING BUTTON ------ #
+                    # CALL our cooldown check function
+                    can_generate, hours_left = check_generation_cooldown()
+
+                    if can_generate:
+                        # USER CAN GENERATE: Show the button
+                        if st.button("🌙 Generate Full Illustrated Book 🧸", type="primary", key="generate_book_button", use_container_width=True):
+                            # SAVE the current time when they click generate
+                            from datetime import datetime
+                            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            st.session_state.last_generation_time = current_time
+
+                            # SET the flag to True to trigger image generation
+                            st.session_state.generate_images = True
+
+                            # RERUN to trigger image generation
+                            st.rerun()
+
+                    else:
+                        # USER IN COOLDOWN: Show time remaining message instead of button
+                        st.warning(f"⏰ You've used your free generation. Come back in {hours_left:.1f} hours for another!")
+
+                        # ------ END RATE LIMIT CHECK ------ #
+                    
 
                 # Small spacing between buttons
                 st.write("")
 
                 # Reset button (always available)
                 if st.button("🔃 Start New Story", type="secondary", key="reset_button", use_container_width=True):
+                    # PRESERVE rate limit, clear everything else
+                    # Save the cooldown timestamp before clearing
+                    cooldown_time = st.session_state.get('last_generation_time', None)
+
                     # Clear all session state
                     for key in list(st.session_state.keys()):
                         del st.session_state[key]
+
+                    # Restore the cooldown timestamp so user can't spam by resetting 
+                    if cooldown_time:
+                        st.session_state.last_generation_time = cooldown_time
+
                     st.rerun()
+
             # Stop execution here to avoid displaying the chat input placeholder on the final screen
             return
 
