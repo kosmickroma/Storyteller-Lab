@@ -78,7 +78,18 @@ STAGE-BY-STAGE PROCESS:
     b) The main focus of the story (e.g., sharing, colors, bedtime, bravery).
 
 **STAGE 1.5: Character Detail Generation (Silent)**
-- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, immediately and silently generate a **detailed** physical description of the Protagonist (e.g., specific colors, size, defining features, clothing, mood, unique characteristics). **DO NOT show this to the user.** Instead, store it internally and present it in this EXACT format on its own line for your internal use: "CHARACTER DETAILS: [your detailed description here]". This description MUST be used as a prefix for all future ILLUSTRATION PROMPTS to maintain visual consistency. After generating these details silently, immediately proceed to Stage 2 without waiting for user input.
+- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, immediately and silently generate a **detailed** physical description of the Protagonist. BE EXTREMELY SPECIFIC about:
+    - Exact fur/skin color (use color names, not generic descriptors)
+    - Eye color
+    - Clothing colors and style
+    - Size and proportions
+    - Any accessories (hat, bow, etc.)
+    - Species (if an animal, specify: rabbit, bear, fox, etc.)
+**DO NOT show this to the user.** Instead, store it internally and present it in this EXACT format on its own line: "CHARACTER DETAILS: [species] [color] [physical features] [clothing description] [accessories]". 
+
+EXAMPLE: "CHARACTER DETAILS: white fluffy rabbit with bright blue eyes, wearing an orange space suit with blue boots and gloves, small teddy bear companion in matching orange suit"
+
+This description MUST be used as a prefix for ALL future ILLUSTRATION PROMPTS to maintain visual consistency. After generating these details silently, immediately proceed to Stage 2 without waiting for user input.
 
 **STAGE 2: Style and Mood**
 - **ACTION:** After receiving the Protagonist name and Topic, summarize them for the user, and then ask for the desired style and mood (e.g., 'rhyming poem', 'cozy', 'silly', adventure').
@@ -91,16 +102,38 @@ STAGE-BY-STAGE PROCESS:
 Then create a short, catchy children's book title (3-5 words maximum) and present it in this EXACT format on its own line: "BOOK TITLE: [Your Title Here]". State clearly that the final manuscript will be **16 pages long** and will use **Level A (Pre-Reader)** vocabulary, meaning sentences will be very short (max 8 words) with strong rhythmic repetition. Ask the user to confirm these details are correct, and state that when they are ready, they should **type 'START STORY'** to begin the final manuscript creation.
 
 **STAGE 4: Final Manuscript Generation**
--**ACTION** Once the user types "START STORY", generate the complete **16-page** manuscript immediately. Your ouput MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
+-**ACTION** Once the user types "START STORY", generate the complete **16-page** manuscript immediately. Your output MUST strictly follow the OUTPUT FORMAT below. Do NOT add any title, introduction, or conclusion text outside of the numbered list.
 
 OUTPUT FORMAT (Must be used in Stage 4):
 Your entire output must be formatted as a numbered list with two parts per page.
 
+**CRITICAL ILLUSTRATION RULES:**
+- EVERY illustration prompt MUST start with the CHARACTER DETAILS from Stage 1.5
+- The character's appearance (fur color, clothing, features) MUST stay identical across all 16 pages
+- Describe the SPECIFIC PHYSICAL LOCATION for each scene. The character must be IN the location, not viewing it from elsewhere.
+
+CORRECT EXAMPLES by story type:
+  * Space adventure: "inside the rocket cockpit with control panels" NOT "by bedroom window looking at rocket"
+  * Forest journey: "standing in the middle of tall pine trees with mushrooms at feet" NOT "looking at forest from house"
+  * Ocean story: "swimming underwater surrounded by colorful fish and coral" NOT "looking at ocean from beach"
+  * City adventure: "walking down busy sidewalk with tall buildings on both sides" NOT "watching city from car window"
+  * Kitchen activity: "standing at the kitchen counter mixing bowl in hands" NOT "peeking into kitchen from doorway"
+  * Playground: "sitting on the swing mid-air with playground equipment around" NOT "looking at playground from far away"
+
+WRONG PATTERNS TO AVOID:
+  * "watching X" / "looking at X" / "viewing X" - these create distance
+  * "by the window" / "through the window" - this keeps character stuck inside
+  * "from their room" / "in their bedroom" - avoid unless bedroom IS the setting
+  
+- If the story involves travel or exploration, show the character IN each new location, actively participating
+- Secondary characters (companions, friends, etc.) must also maintain consistent appearance across all pages
+
 1. **PAGE TEXT:** [One simple sentence, max 10 words. Use a strong, consistent **AABB rhyming structure** (page 1 rhymes with page 2, page 3 with page 4, etc.). Maintain a bold, bouncy, and rhythmic meter reminiscent of **Dr. Seuss**. Example: "Little Lola loves to leap high. She jumps and plays beneath the blue sky."] 
-    **ILLUSTRATION PROMPT:** [**Highly detailed and consistent** description of the Protagonist AND any recurring props/objects/secondary characters (specify exact colors, patterns, sizes, species, features) for consistency, followed by the scene description and requested style.]
+    **ILLUSTRATION PROMPT:** [Start with CHARACTER DETAILS, then describe the EXACT PHYSICAL LOCATION and scene action. Example: "white fluffy rabbit with bright blue eyes wearing orange space suit, sitting inside spaceship cockpit with colorful control buttons, looking excited through the front window at stars"]
     
 2. **PAGE TEXT:** [...]
-    **ILLUSTRATION PROMPT:** [...]
+    **ILLUSTRATION PROMPT:** [CHARACTER DETAILS + specific location + action]
+    
 [Continue through page 16]
 
 **STAGE: 5 Completion**
@@ -109,7 +142,6 @@ Your entire output must be formatted as a numbered list with two parts per page.
 
 # --- GLOBAL STYLE SETTINGS FOR IMAGE GENERATION ---
 GLOBAL_IMAGE_STYLE = "children's book illustration, vintage style cartoon, 80s and 90s aesthetic, soft pastel colors, dreamy lighting, crayon texture, grainy texture, soft fuzzy lines, simple shapes, whimsical, fantastical, professional digital painting"
-
 
 
 ##########################################################################
@@ -206,6 +238,177 @@ def generate_image_for_page(client, prompt: str, page_number: int):
         
         return None
     
+################################################################################################
+############################ PROMPT VALIDATOR & AUTO-CORRECTOR #################################
+################################################################################################
+
+# ------------------ PROMPT VALIDATOR & AUTO-CORRECTOR ------------------ #
+def validate_and_fix_illustration_prompt(prompt: str, character_details: str, page_number: int) -> str:
+    """
+    Validates and corrects illustration prompts to ensure they follow the rules.
+    
+    This is a safety net that catches common Gemini mistakes BEFORE image generation:
+    1. Ensures CHARACTER DETAILS are at the start
+    2. Removes "watching/looking at" passive language
+    3. Fixes location issues (removes "by window", "from room")
+    4. Ensures character is IN the location, not observing it
+    
+    Args:
+        prompt: The original illustration prompt from Gemini
+        character_details: The CHARACTER DETAILS from Stage 1.5
+        page_number: Current page number (for logging)
+    
+    Returns:
+        Fixed/validated prompt ready for Imagen
+    """
+    
+    original_prompt = prompt
+    fixed = False
+    
+    # STEP 1: Ensure CHARACTER DETAILS are present
+    if character_details not in prompt:
+        # Character details missing! Add them at the start
+        prompt = f"{character_details}, {prompt}"
+        fixed = True
+    
+    # STEP 2: Remove passive "watching/looking at" language
+    # These phrases create distance - character should BE in the scene
+    passive_patterns = [
+        (r'\blooking at\b', 'surrounded by'),
+        (r'\bwatching\b', 'with'),
+        (r'\bviewing\b', 'in'),
+        (r'\bobserving\b', 'near'),
+        (r'\bseeing\b', 'with'),
+        (r'\bgazing at\b', 'surrounded by'),
+        (r'\bstaring at\b', 'near')
+    ]
+    
+    for pattern, replacement in passive_patterns:
+        if re.search(pattern, prompt, re.IGNORECASE):
+            prompt = re.sub(pattern, replacement, prompt, flags=re.IGNORECASE)
+            fixed = True
+    
+    # STEP 3: Fix "by the window" and similar distancing phrases
+    # These keep character stuck in one place watching the adventure
+    distancing_fixes = [
+        (r'\bby the window\b', 'inside with'),
+        (r'\bthrough the window\b', 'inside looking out at'),
+        (r'\bfrom their room\b', 'in the scene with'),
+        (r'\bfrom the bedroom\b', 'in the adventure with'),
+        (r'\bfrom their\b', 'with their'),
+        (r'\bin their bedroom looking\b', 'in the adventure'),
+        (r'\bin the backyard looking at\b', 'with'),
+        (r'\bstanding near and watching\b', 'standing with'),
+        (r'\bnext to .* looking at\b', 'with')
+    ]
+    
+    for pattern, replacement in distancing_fixes:
+        if re.search(pattern, prompt, re.IGNORECASE):
+            prompt = re.sub(pattern, replacement, prompt, flags=re.IGNORECASE)
+            fixed = True
+    
+    # STEP 4: Remove repetitive "in their [location] watching" patterns
+    # Common mistake: "in their bedroom watching a rocket" should be "inside the rocket"
+    if re.search(r'\bin their (bedroom|room|house|home)\b', prompt, re.IGNORECASE):
+        if page_number > 3:  # After setup pages, character should be in the adventure
+            # Don't specify where - just remove the "in their room" part
+            prompt = re.sub(r'\bin their (bedroom|room|house|home)\b', 'in the adventure', prompt, flags=re.IGNORECASE)
+            fixed = True
+    
+    # LOG if we made fixes (only in debug mode)
+    if fixed and st.session_state.get('show_debug', False):
+        st.session_state.setdefault('prompt_fixes', []).append({
+            'page': page_number,
+            'original': original_prompt,
+            'fixed': prompt
+        })
+    
+    return prompt
+
+########################################################################################################
+############################ NUCLEAR OPTION: GEMINI SELF-VALIDATION ####################################
+########################################################################################################
+
+def nuclear_validate_manuscript(client, raw_manuscript: str, character_details: str, story_theme: str) -> str:
+    """
+    The NUCLEAR OPTION: Uses Gemini to validate and fix its own illustration prompts.
+    
+    This catches issues that regex can't, like:
+    - Character stuck inside when they should be exploring
+    - Passive observation instead of active participation
+    - Any other creative ways Gemini finds to avoid following instructions
+    
+    Args:
+        client: Gemini API client
+        raw_manuscript: The complete 16-page manuscript text
+        character_details: CHARACTER DETAILS from Stage 1.5
+        story_theme: Detected story theme (space, ocean, forest, etc.)
+    
+    Returns:
+        Corrected manuscript with fixed illustration prompts
+    """
+    
+    st.toast("🔧 Running quality validation on your story...")
+    
+    # Build the validation prompt
+    validation_prompt = f"""
+You are a quality control editor for children's book illustrations. Your job is to review illustration prompts and fix any that show the character as a PASSIVE OBSERVER instead of an ACTIVE PARTICIPANT.
+
+**STORY THEME:** {story_theme}
+
+**CHARACTER DETAILS:** {character_details}
+
+**CRITICAL RULES:**
+1. If the story involves travel/exploration (space, ocean, forest, city, etc.), the character must be IN each new location, not viewing it from elsewhere
+2. The character should NEVER be "inside looking at" or "watching" the adventure - they should BE IN the adventure
+3. For travel stories: Character should be INSIDE vehicle during travel, then OUTSIDE exploring at destinations
+4. Remove phrases like "inside the rocket/ship/vehicle" when character should be exploring
+5. Keep character details IDENTICAL across all pages
+
+**COMMON MISTAKES TO FIX:**
+- "inside the rocket on the planet surface" → "standing on the planet surface"
+- "in the cockpit with alien landscape visible" → "walking on the alien landscape"
+- "inside looking at the ocean" → "swimming in the ocean"
+- "in the vehicle watching the forest" → "standing among the trees in the forest"
+
+**MANUSCRIPT TO REVIEW:**
+{raw_manuscript}
+
+**YOUR TASK:**
+Review each ILLUSTRATION PROMPT (there are 16 total). For any prompt where the character is stuck inside/watching instead of actively participating:
+1. Rewrite ONLY that illustration prompt
+2. Keep the PAGE TEXT unchanged
+3. Maintain character consistency
+4. Ensure character is IN the location, not viewing it
+
+**OUTPUT FORMAT:**
+Return the COMPLETE manuscript with all 16 pages. Only change illustration prompts that need fixing. Keep everything else identical, including all numbering and formatting.
+
+If no changes are needed, return the manuscript exactly as provided.
+"""
+
+    try:
+        # Call Gemini to validate and fix the manuscript
+        response = client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=validation_prompt
+        )
+        
+        corrected_manuscript = response.text
+        
+        # Store validation info for debug view
+        if corrected_manuscript != raw_manuscript:
+            st.session_state.nuclear_validation_applied = True
+            st.session_state.nuclear_changes_made = "Manuscript was improved by quality validation"
+        else:
+            st.session_state.nuclear_validation_applied = False
+            
+        return corrected_manuscript
+        
+    except Exception as e:
+        st.warning(f"⚠️ Validation check failed: {str(e)[:100]}... Using original manuscript.")
+        return raw_manuscript
+
 # Parse Manuscript
 def parse_manuscript (full_text: str):
     """
@@ -230,10 +433,18 @@ def parse_manuscript (full_text: str):
             # COMBINE: Prepend the global style to the contextual description
             if 'protagonist_description' in st.session_state:
                 character_desc = st.session_state.protagonist_description
-                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {character_desc}, {illustration_content}"
+
+                # VALIDATE & FIX the prompt before using it
+                page_count = len(pages) + 1 # Current page number
+                corrected_prompt = validate_and_fix_illustration_prompt(
+                    illustration_content,
+                    character_desc,
+                    page_count
+                )
+
+                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {character_desc}, {corrected_prompt}"
             else:
                 final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {illustration_content}"
-
 
             pages.append({
                 "page_text": page_text,
@@ -243,30 +454,79 @@ def parse_manuscript (full_text: str):
     return pages
 
 # ------------------ GENERATE COVER IMAGE ------------------ #
-def generate_cover_image(client, protagonist_description: str, title: str):
+def generate_cover_image(client, protagonist_description: str, title: str, story_theme: str = ""):
     """
-    Generates a cover image for the book using the protagonist description and title.
-    Returns the generated image object.
+    Generates a professional, dynamic cover image for the book.
+    
+    Args:
+        client: Gemini API client
+        protagonist_description: Detailed character description from Stage 1.5
+        title: Book title
+        story_theme: Main theme/setting of the story (e.g., "space adventure", "forest journey")
+    
+    Returns:
+        Generated image object
     """
-
+    
     # Check if cover is already cached
     if 'cover_image' in st.session_state:
         return st.session_state['cover_image']
 
-    st.toast("🎨 Creating your book cover...")
+    st.toast("🎨 Creating your professional book cover...")
 
     try:
-        #Create a cover-appropriate prompt
-        cover_prompt = f"{GLOBAL_IMAGE_STYLE}, book cover illustration, NO text, NO letters, NO words in image, {protagonist_description} in a dynamic hero pose, exciting and inviting composition, perfect for a children's book cover"
+        # PROFESSIONAL COVER COMPOSITION TECHNIQUES
+        # These are used by real children's book illustrators
+        
+        composition_styles = [
+            "dynamic diagonal composition with character in action pose",
+            "character leaping forward toward viewer with outstretched arms",
+            "low angle hero shot looking up at character",
+            "character in mid-jump with exciting background behind them"
+        ]
+        
+        # Select a random dynamic composition
+        import random
+        composition = random.choice(composition_styles)
+        
+        # BUILD: Professional cover prompt with 5 key elements:
+        # 1. Global art style
+        # 2. Cover-specific requirements  
+        # 3. Character details (from Stage 1.5)
+        # 4. Dynamic composition
+        # 5. Story theme/setting
+        
+        cover_prompt = f"""
+{GLOBAL_IMAGE_STYLE}, professional children's book cover illustration, 
 
-        # Call the image generation
+COVER REQUIREMENTS:
+- NO text, NO letters, NO words, NO title anywhere in the image
+- Book cover composition with clear focal point
+- Highly polished, more detailed than interior illustrations
+- Eye-catching and dynamic
+- Professional publishing quality
+
+CHARACTER:
+{protagonist_description}
+
+COMPOSITION:
+{composition}, exciting and inviting, character is the clear focus, expressive face showing joy and excitement
+
+SETTING/THEME:
+{story_theme if story_theme else 'exciting adventure setting'}, vibrant and colorful background that supports but doesn't overwhelm the character, sense of wonder and adventure
+
+MOOD:
+Joyful, adventurous, inviting, perfect for drawing in young readers, energetic and fun
+        """.strip()
+
+        # Call the image generation with the enhanced prompt
         result = client.models.generate_images(
             model='imagen-3.0-generate-002',
             prompt=cover_prompt,
             config=dict(
                 number_of_images=1,
                 output_mime_type="image/jpeg",
-                aspect_ratio="1:1"
+                aspect_ratio="1:1"  # Square format for book covers
             )
         )
 
@@ -280,11 +540,157 @@ def generate_cover_image(client, protagonist_description: str, title: str):
         error_message = str(e)
         st.error(f"❌ Cover generation failed: {error_message[:100]}...")
         st.session_state['cover_image'] = 'FAILED'
-        return None 
+        return None
+    
+############################################################################################
+############################ GENERATE PDF ##################################################
+############################################################################################
 
-#########################################################################################################
+def generate_pdf_book(title: str, cover_image_bytes, pages_data: list):
+    """
+    Generates a PDF of the story with cover + text/image pages.
+    
+    Args:
+        title: Book title
+        cover_image_bytes: Cover image data from Imagen
+        pages_data: List of dicts with 'page_text' and image data
+        
+    Returns:
+        PDF file as bytes (ready for download)
+    """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+    from io import BytesIO
+
+    # Build the PDF in memory (not save to disk)
+    # BytesIO creates a temp. file-like object in RAM
+    buffer = BytesIO()
+
+    # CREATE: A PDF canvas (blank document) with letter size pages
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+
+    # GET: Page dimensions for positioning elements
+    page_width, page_height = letter # 612 x 792 points (standard US letter)
+
+    # -------- PAGE 1: COVER PAGE -------- #
+    # TITLE: Draw the book title at the top
+    pdf.setFont("Helvetica-Bold", 36) #Large, bold font
+    pdf.drawCentredString(page_width / 2, page_height - 100, title)
+
+    # COVER IMAGE: Place it in the center of the page 
+    if cover_image_bytes and cover_image_bytes != 'FAILED':
+        try: 
+            # CONVERT: Image bytes to ImageReader format
+            cover_img = ImageReader(BytesIO(cover_image_bytes))
+
+            # CALCULATE: Image position (centered)
+            img_width = 400 # Width in points
+            img_height = 400 # Height in points
+            x_position = (page_width - img_width) / 2 # Center horizontally
+            y_position = (page_height - img_height) / 2 - 50 # Center vertically, nudge down
+
+            # DRAW: The cover image
+            pdf.drawImage(cover_img, x_position, y_position, width=img_width, height=img_height)
+        except Exception as e:
+            pass
+
+    # BRANDING: Add "Storyteller Lab" at the bottom
+    pdf.setFont("Helvetica", 12)
+    pdf.drawCentredString(page_width / 2, 50, "Created with Storyteller Lab")
+
+    # FINISH: This page and move to the next
+    pdf.showPage()
+
+    # ======== PAGES 2-17: STORY PAGES (TEXT + IMAGE SIDE BY SIDE) ======== #
+    # LOOP: Through each of the 16 story pages
+    for i, page in enumerate(pages_data):
+        page_number = i + 1
+
+        # LEFT SIDE: Story text
+        # POSITION: Text in the left half of the page, vertically centered 
+        text_x = page_width / 4 # Center of the left half 
+        text_y = page_height / 2 # MIddle of page
+
+        # FONT: Large, easy-to-read text for toddlers
+        pdf.setFont("Helvetica-Bold", 24)
+
+        # WRAP: Text if it's too long (split into multiple lines)
+        text = page['page_text']
+        max_width = 250 # Maximum width for text in points
+
+        # Simple text wrapping: split by words and fit to width
+        words = text.split()
+        lines = []
+        current_line = []
+
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            # Check if line is too wide
+            if pdf.stringWidth(test_line, "Helvetica-Bold", 24) <= max_width:
+                current_line.append(word)
+            else: 
+                # Line is full, start new line
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+
+        # Don't forget the last line
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        # DRAW: Each line of text, stacked vertically
+        line_height = 30 # Space between lines
+        start_y = text_y + (len(lines) * line_height / 2) # Start above center
+
+        for idx, line in enumerate(lines):
+            pdf.drawCentredString(text_x, start_y - (idx * line_height), line)
+
+        # RIGHT SIDE: Illustration image
+        # CHECK: If this page has a generated image in session_state
+        image_key = f"image_page_{page_number}"
+
+        if image_key in st.session_state:
+            image_data = st.session_state[image_key]
+
+            # SKIP: Failed images 
+            if image_data != 'FAILED':
+                try:
+                    # CONVERT: Image bytes to ImageReader format
+                    img_bytes = image_data.image.image_bytes
+                    page_img = ImageReader(BytesIO(img_bytes))
+
+                    # POSITION: Image in the right half of the page
+                    img_size = 300 # Square image size
+                    img_x = (page_width * 3 / 4) - (img_size / 2) # Center of right half
+                    img_y = (page_height / 2) - (img_size / 2) # Vertically centered
+
+                    # DRAW: The illustration
+                    pdf.drawImage(page_img, img_x, img_y, width=img_size, height=img_size)
+                except Exception as e:
+                    # If image fails, just skip it
+                    pass
+            
+        # PAGE NUMBER: Small page number at bottom
+        pdf.setFont("Helvetica", 10)
+        pdf.drawCentredString(page_width / 2, 30, f"Page {page_number}")
+        # FINISH: This page and move to the next
+        pdf.showPage()
+
+    # ======== FINALIZE PDF ======== #
+    # SAVE: Write all changes to the buffer
+    pdf.save()
+
+    # REWIND: Move the buffer's read position to the beginning
+    buffer.seek(0)
+
+    # RETURN: The PDF as bytes (ready for download)
+    return buffer.getvalue()
+
+
+########################################################################################################
 ############################ MAIN #######################################################################
-#########################################################################################################
+########################################################################################################
 
 
 def main():
@@ -293,6 +699,8 @@ def main():
     if 'processing_user_input' not in st.session_state:
         st.session_state.processing_user_input = False
     # ### --- REMOVED: input_placeholder is gone! --- ###
+    # Add back the Streamlit page configuration and initialization
+    
 
 #######################################################################################
 ########################### LOGO ######################################################
@@ -331,10 +739,14 @@ def main():
         st.divider()
 
     # --- SESSION STATE SETUP ---
+
+    if 'chat_initiated' not in st.session_state:
+        st.session_state.chat_initiated = False
+
     if "gemini_chat" not in st.session_state:
         st.session_state.messages = []
         initialize_gemini_chat() 
-        st.session_state.chat_initiated = False 
+        
 
     # --- CHAT INITIATION LOGIC: Show start button if chat hasn't begun ---
     # This block handles the initial screen and forces an exit (return) once the button is clicked or if the chat hasn't started yet.
@@ -344,7 +756,7 @@ def main():
         button_clicked = False
         
         # Tip for better consistency
-        st.info("💡 **Tip for best results:** Stories with repetitve structures (counting, colors, daily routines, alphabet) produce more visually consistent illustrations than complex narratives.")
+        st.info("💡 **Tip:** Repetitive story structures produce better visual consistency across pages.")
 
         # Three equal-width columns to center the button
         with st.container():
@@ -408,8 +820,10 @@ def main():
                             generate_cover_image(
                                 client,
                                 st.session_state.protagonist_description,
-                                st.session_state.story_header
+                                st.session_state.story_header,
+                                st.session_state.get('story_theme', 'exciting adventure')
                             )
+
                     # Display the cover
                     if 'cover_image' in st.session_state:
                         cover_data = st.session_state['cover_image']
@@ -423,6 +837,38 @@ def main():
             # Info message directing users to the generate button 
             st.info("👇 Read your story below, then generate full illustrations or start over. (Limit: One full generation per 24 hours) ")
 
+            # 🔍 DEBUG TOGGLE
+            with st.expander("🔧 Developer Options"):
+                st.session_state.show_debug = st.checkbox("Show image generation prompts", value=False)
+                if st.session_state.get('protagonist_description'):
+                    st.write("**Character Details Captured:**")
+                    st.code(st.session_state.protagonist_description)
+                
+               # Show nuclear validation results
+                if st.session_state.get('nuclear_validation_applied'):
+                    st.write("**☢️ Nuclear Quality Validation:**")
+                    st.success("✅ Gemini reviewed and improved the manuscript prompts")
+
+                    if st.session_state.get('raw_manuscript_original') and st.session_state.get('raw_manuscript'):
+                        with st.expander("📋 View Before/After Manuscripts"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write("**Original:**")
+                                st.text_area("", st.session_state.raw_manuscript_original[:1000] + "...", height=200, key="original_ms")
+                            with col2:
+                                st.write("**Corrected:**")
+                                st.text_area("", st.session_state.raw_manuscript[:1000] + "...", height=200, key="corrected_ms")
+
+                # Show prompt fixes if any were made
+                if st.session_state.get('prompt_fixes'):
+                    st.write("**🔧 Automatic Prompt Corrections:**")
+                    for fix in st.session_state['prompt_fixes']:
+                        with st.expander(f"Page {fix['page']} - Fixed"):
+                            st.write("❌ **Original (bad):**")
+                            st.text(fix['original'][:200] + "..." if len(fix['original']) > 200 else fix['original'])
+                            st.write("✅ **Corrected (good):**")
+                            st.text(fix['fixed'][:200] + "..." if len(fix['fixed']) > 200 else fix['fixed'])
+
             # 2. Loop through each page for text and image generation/display
             for i, page in enumerate(st.session_state.parsed_pages):
                 page_number = i + 1
@@ -430,6 +876,11 @@ def main():
                 # Use st.container() to visually seperate each page
                 with st.container(border=True):
                     st.markdown(f"**Page {page_number}**")
+
+                    # 🔍 DEBUG: Show image prompts (toggle this on/off)
+                    if st.session_state.get('show_debug', False):
+                        with st.expander("🔍 Debug: View Image Prompt"):
+                            st.code(page['image_prompt'], language="text")
 
                     # --- Check if we should generate images --- #
                     should_generate_images = st.session_state.get('generate_images', False)
@@ -511,7 +962,39 @@ def main():
                         st.warning(f"⏰ You've used your free generation. Come back in {hours_left:.1f} hours for another!")
 
                         # ------ END RATE LIMIT CHECK ------ #
-                    
+                # If images ARE generated, show download button
+                else:
+                    # DOWNLOAD PDF BUTTON
+                    if st.button("📥 Download PDF Book", type="primary", key="download_pdf_button", use_container_width=True):
+                        # Generate the PDF
+                        with st.spinner("Creating your PDF..."):
+                            # Get cover image bytes
+                            cover_bytes = st.session_state.get('cover_image').image.image_bytes if 'cover_image' in st.session_state else None
+                            
+                            # Call PDF generation function
+                            pdf_bytes = generate_pdf_book(
+                                title=st.session_state.story_header,
+                                cover_image_bytes=cover_bytes,
+                                pages_data=st.session_state.parsed_pages
+                            )
+
+                            # Store PDF in session for download
+                            st.session_state.pdf_file = pdf_bytes
+
+                        st.success("✅ PDF ready for download!")
+
+                    # If PDF exists, show download link
+                    if 'pdf_file' in st.session_state:
+                        from datetime import datetime
+                        filename = f"storyteller_lab_{st.session_state.story_header.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+                        st.download_button(
+                            label="💾 Save PDF to Computer",
+                            data=st.session_state.pdf_file,
+                            file_name=filename,
+                            mime="application/pdf",
+                            use_container_width=True
+                        )    
 
                 # Small spacing between buttons
                 st.write("")
@@ -599,8 +1082,59 @@ def main():
                     raw_manuscript = ai_response.replace("Project Complete! The Storyteller's Manuscript is ready.", "").strip()
                     st.session_state.raw_manuscript = raw_manuscript
 
-                    # 2. Immediately parse and store the page data
-                    st.session_state.parsed_pages = parse_manuscript(raw_manuscript)
+                    # 2. NUCLEAR OPTION: Validate and fix the manuscript before parsing
+                    corrected_manuscript = nuclear_validate_manuscript(
+                    get_gemini_client(GEMINI_API_KEY),
+                    raw_manuscript,
+                    st.session_state.get('protagonist_description', 'the main character'),
+                    st.session_state.get('story_theme', 'exciting adventure')
+                )
+                    
+                    # Store both versions for debugging
+                    st.session_state.raw_manuscript_original = raw_manuscript
+                    st.session_state.raw_manuscript = corrected_manuscript
+                    
+                    # 3. Parse the CORRECTED manuscript
+                    st.session_state.parsed_pages = parse_manuscript(corrected_manuscript)
+
+                    # 2.5 EXTRACT STORY THEME for dynamic cover generation
+                    # Analyze the first few pages to determine the main setting/theme
+                    theme_keywords = {
+                        'space': ['space', 'rocket', 'planet', 'star', 'moon', 'alien', 'galaxy', 'astronaut'],
+                        'ocean': ['ocean', 'sea', 'fish', 'underwater', 'whale', 'coral', 'wave', 'beach'],
+                        'forest': ['forest', 'tree', 'woods', 'jungle', 'animal', 'leaves', 'nature'],
+                        'city': ['city', 'building', 'street', 'car', 'urban', 'downtown', 'sidewalk'],
+                        'home': ['home', 'house', 'room', 'kitchen', 'bedroom', 'family'],
+                        'playground': ['playground', 'park', 'swing', 'slide', 'playing', 'outside'],
+                        'school': ['school', 'classroom', 'teacher', 'learn', 'friends', 'desk'],
+                        'farm': ['farm', 'barn', 'tractor', 'animals', 'fields', 'country']
+                    }
+                    
+                    # Check the manuscript text for theme keywords
+                    manuscript_lower = raw_manuscript.lower()
+                    theme_scores = {}
+                    
+                    for theme, keywords in theme_keywords.items():
+                        score = sum(manuscript_lower.count(keyword) for keyword in keywords)
+                        if score > 0:
+                            theme_scores[theme] = score
+                    
+                    # Get the theme with highest score
+                    if theme_scores:
+                        detected_theme = max(theme_scores, key=theme_scores.get)
+                        theme_descriptions = {
+                            'space': 'outer space adventure with rockets, planets, and stars',
+                            'ocean': 'underwater ocean adventure with sea creatures and coral',
+                            'forest': 'forest adventure with tall trees and woodland creatures',
+                            'city': 'city adventure with tall buildings and busy streets',
+                            'home': 'cozy home setting with warm family atmosphere',
+                            'playground': 'fun playground adventure with swings and friends',
+                            'school': 'school adventure with learning and friendship',
+                            'farm': 'farm adventure with animals and countryside'
+                        }
+                        st.session_state.story_theme = theme_descriptions.get(detected_theme, 'exciting adventure')
+                    else:
+                        st.session_state.story_theme = 'exciting adventure'
 
                     # 3. Extract the book title from Stage 3 message
                     # The AI was instructed to fromat it as "BOOK TITLE: [Title]"
