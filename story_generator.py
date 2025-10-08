@@ -171,7 +171,10 @@ def initialize_gemini_chat():
         return None
     
     client = get_gemini_client(GEMINI_API_KEY)
-    config = types.GenerateContentConfig(system_instruction=MASTER_PROMPT)
+    config = types.GenerateContentConfig(
+        system_instruction=MASTER_PROMPT,
+        temperature=0.7
+    )
 
     # Use the model that is proven to handle constraints
     chat = client.chats.create(model='gemini-2.5-flash', config=config)
