@@ -77,19 +77,27 @@ STAGE-BY-STAGE PROCESS:
     a) The name of the main character.
     b) The main focus of the story (e.g., sharing, colors, bedtime, bravery).
 
-**STAGE 1.5: Character Detail Generation (Silent)**
-- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, immediately and silently generate a **detailed** physical description of the Protagonist. BE EXTREMELY SPECIFIC about:
-    - Exact fur/skin color (use color names, not generic descriptors)
-    - Eye color
-    - Clothing colors and style
-    - Size and proportions
-    - Any accessories (hat, bow, etc.)
-    - Species (if an animal, specify: rabbit, bear, fox, etc.)
-**DO NOT show this to the user.** Instead, store it internally and present it in this EXACT format on its own line: "CHARACTER DETAILS: [species] [color] [physical features] [clothing description] [accessories]". 
-
-EXAMPLE: "CHARACTER DETAILS: white fluffy rabbit with bright blue eyes, wearing an orange space suit with blue boots and gloves, small teddy bear companion in matching orange suit"
-
-This description MUST be used as a prefix for ALL future ILLUSTRATION PROMPTS to maintain visual consistency. After generating these details silently, immediately proceed to Stage 2 without waiting for user input.
+**STAGE 1.5: Character Detail Generation**
+- **ACTION:** After receiving the Protagonist name and Topic in Stage 1, you MUST immediately respond with TWO parts:
+    
+    **PART 1 - CHARACTER DETAILS (FIRST LINE):**
+    Your response MUST start with this exact format on the very first line:
+    "CHARACTER DETAILS: [species] with [exact fur/skin color] fur/skin, [eye color] eyes, wearing [clothing description with exact colors], [size description], [any accessories]"
+    
+    **BE EXTREMELY SPECIFIC:**
+    - Use exact color names (NOT "dark" or "light" - use "navy blue", "crimson red", "forest green")
+    - Specify species if animal (rabbit, mouse, bear, fox, etc.)
+    - Describe clothing with exact colors and style
+    - Include size (small, tiny, etc.)
+    - List any accessories (hat, bow, backpack, etc.)
+    
+    **EXAMPLE:** 
+    "CHARACTER DETAILS: small gray mouse with dark gray fur, bright black eyes, wearing a blue and white striped space suit with orange boots and gloves, small round ears, long thin tail"
+    
+    **PART 2 - PROCEED TO STAGE 2:**
+    After the CHARACTER DETAILS line, immediately summarize the protagonist and topic, then ask for Stage 2 (Style and Mood).
+    
+**CRITICAL:** Do NOT wait for user confirmation between Stage 1.5 and Stage 2. Generate CHARACTER DETAILS, then immediately ask for Style and Mood in the same response.
 
 **STAGE 2: Style and Mood**
 - **ACTION:** After receiving the Protagonist name and Topic, summarize them for the user, and then ask for the desired style and mood (e.g., 'rhyming poem', 'cozy', 'silly', adventure').
@@ -110,6 +118,7 @@ Your entire output must be formatted as a numbered list with two parts per page.
 **CRITICAL ILLUSTRATION RULES:**
 - EVERY illustration prompt MUST start with the CHARACTER DETAILS from Stage 1.5
 - The character's appearance (fur color, clothing, features) MUST stay identical across all 16 pages
+- **SINGLE CHARACTER ONLY:** Include ONLY the protagonist. DO NOT add companion, friends, siblings, pets or other characters unless the PAGE TEXT explicitly names them. If the protagonist is alone in the text, they MUST be alone in the illustration. No teddy bears, no companion animals, no friends- just the protagonist.
 - Describe the SPECIFIC PHYSICAL LOCATION for each scene. The character must be IN the location, not viewing it from elsewhere.
 
 CORRECT EXAMPLES by story type:
@@ -141,7 +150,7 @@ WRONG PATTERNS TO AVOID:
 """
 
 # --- GLOBAL STYLE SETTINGS FOR IMAGE GENERATION ---
-GLOBAL_IMAGE_STYLE = "children's book illustration, vintage style cartoon, 80s and 90s aesthetic, soft pastel colors, dreamy lighting, crayon texture, grainy texture, soft fuzzy lines, simple shapes, whimsical, fantastical, professional digital painting"
+GLOBAL_IMAGE_STYLE = "children's book illustration, vintage style cartoon, 80s and 90s aesthetic, soft pastel colors, dreamy lighting, crayon texture, grainy texture, soft fuzzy lines, simple shapes, whimsical, fantastical, professional digital painting, CRITICAL: character must maintain exact colors as described in character details, consistent character appearance across all illustrations, no color variations allowed"
 
 
 ##########################################################################
@@ -314,6 +323,35 @@ def validate_and_fix_illustration_prompt(prompt: str, character_details: str, pa
             # Don't specify where - just remove the "in their room" part
             prompt = re.sub(r'\bin their (bedroom|room|house|home)\b', 'in the adventure', prompt, flags=re.IGNORECASE)
             fixed = True
+
+    # STEP 5: Remove phrases that might add extra characters
+    # The story should only have ONE character unless text says otherwise
+    extra_character_patterns = [
+        (r'\bwith (a |an |another )?friend\b', 'alone'),
+        (r'\bwith (a |an |another )?companion\b', 'alone'),
+        (r'\band (a |an |another )?mouse\b', ''),  # Specific to prevent "and another mouse"
+        (r'\band (a |an |another )?bear\b', ''),
+        (r'\band (a |an |another )?rabbit\b', ''),
+        (r'\band (a |an |another )?character\b', ''),
+        (r'\bwith others\b', 'alone'),
+        (r'\btogether with\b', 'near'),
+        (r'\baccompanied by\b', 'near'),
+        (r'\bwith (a |an )?(small |tiny )?teddy bear\b', ''),  # Remove teddy bears
+        (r'\bholding (a |an )?(small |tiny )?companion\b', ''),
+        (r'\bwith (a |an )?pet\b', ''),
+        (r'\bwith (a |an )?sibling\b', ''),
+        (r'\bwith (their )?friend\b', 'alone'),
+    ]
+    
+    for pattern, replacement in extra_character_patterns:
+        if re.search(pattern, prompt, re.IGNORECASE):
+            prompt = re.sub(pattern, replacement, prompt, flags=re.IGNORECASE)
+            fixed = True
+    
+    # Clean up any double spaces or awkward phrasing created by removals
+    prompt = re.sub(r'\s+', ' ', prompt).strip()
+    prompt = re.sub(r',\s*,', ',', prompt)  # Remove double commas
+    prompt = re.sub(r',\s*alone', '', prompt)  # Remove awkward ", alone" at end
     
     # LOG if we made fixes (only in debug mode)
     if fixed and st.session_state.get('show_debug', False):
@@ -442,7 +480,35 @@ def parse_manuscript (full_text: str):
                     page_count
                 )
 
-                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {character_desc}, {corrected_prompt}"
+                # ENHANCED: Add explicit color emphasis
+                # Extract specific colors from character description to reinforce them
+                color_keywords = []
+                if 'red' in character_desc.lower():
+                    color_keywords.append('red')
+                if 'blue' in character_desc.lower():
+                    color_keywords.append('blue')
+                if 'orange' in character_desc.lower():
+                    color_keywords.append('orange')
+                if 'green' in character_desc.lower():
+                    color_keywords.append('green')
+                if 'purple' in character_desc.lower():
+                    color_keywords.append('purple')
+                if 'yellow' in character_desc.lower():
+                    color_keywords.append('yellow')
+                if 'white' in character_desc.lower():
+                    color_keywords.append('white')
+                if 'black' in character_desc.lower():
+                    color_keywords.append('black')
+                if 'gray' in character_desc.lower() or 'grey' in character_desc.lower():
+                    color_keywords.append('gray')
+                
+                # Build color emphasis string
+                if color_keywords:
+                    color_emphasis = f"MAINTAIN EXACT COLORS: {', '.join(color_keywords)} as specified in character details"
+                else:
+                    color_emphasis = "maintain exact character colors as described"
+
+                final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, SINGLE CHARACTER ONLY: {character_desc}, {corrected_prompt}, {color_emphasis}, character appearance must be identical across all pages, no other characters visible, protagonist alone in scene"
             else:
                 final_image_prompt = f"{GLOBAL_IMAGE_STYLE}, {illustration_content}"
 
@@ -1057,7 +1123,15 @@ def main():
             try:
                 response = st.session_state.gemini_chat.send_message(prompt)
                 ai_response = response.text
-                
+
+                # -------- EXTRACT CHARACTER DETAILS IMMEDIATELY -------- #
+                # This catches the CHARACTER DETAILS from the very first AI response (Stage 1.5)
+                if "CHARACTER DETAILS:" in ai_response and 'protagonist_description' not in st.session_state:
+                    char_details_match = re.search(r"CHARACTER DETAILS:\s*(.+?)(?:\n|$)", ai_response)
+                    if char_details_match:
+                        st.session_state.protagonist_description = char_details_match.group(1).strip()
+                        # Debug confirmation (optional - remove in production)
+                        # st.toast(f"✅ Character locked: {st.session_state.protagonist_description[:50]}...")
                 # --- MANUSCRIPT VISIBILITY CONTROL (For testing) ---
                 # 5. Add AI response to history
                 #st.session_state.messages.append({"role": "assistant", "content": ai_response})
