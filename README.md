@@ -25,7 +25,7 @@ Developed to showcase advanced **Prompt Engineering**, **LLM orchestration**, an
 * **Structured Narrative:** Enforces a rigid structure (16 pages, **AABB rhyme scheme**, Level A vocabulary) using a custom `MASTER_PROMPT` as a system instruction for the LLM.
 * **Dual-Model Orchestration:** Seamlessly integrates **Gemini 2.5 Flash** for highly-constrained text generation and **Imagen 3.0** for high-quality, professional illustrations.
 * **Automated Quality Control:** Includes sophisticated **RegEx and LLM-based self-validation** (`validate_and_fix_illustration_prompt` and `nuclear_validate_manuscript` functions) to correct common AI errors like passive character placement ("watching the adventure" is corrected to "standing in the adventure").
-* **Future Model Integration:** The architecture is designed for easy upgrading to newer, more capable foundation models, allowing for a **premium generation tier** with improved image quality and character fidelity as new models become available.
+* **Future Model Integration:** The architecture is designed for easy upgrading to newer, more capable foundation models, allowing for a **premium generation tier** with improved image quality and character fidelity as new models becomes available.
 * **Rate-Limit Management:** Implements a 24-hour generation cooldown to manage the high token and image costs associated with generating a complete, 16-image book.
 
 ---
@@ -40,6 +40,7 @@ The app generates a professional cover image and overlays the title for a finish
 | Cover Image |
 | :---: |
 | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/cover.jpg" width="350px"> |
+
 ### Sample Pages (Rhyme and Consistency)
 
 The app demonstrates maintaining the character's core appearance (badger, yellow hat, blue vest, orange shorts) and the specified AABB rhyme pattern across the manuscript.
@@ -48,14 +49,17 @@ The app demonstrates maintaining the character's core appearance (badger, yellow
 | :---: | :---: |
 | **Marcel built a machine, so grand.** | **To visit an ancient, green land.** |
 | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_1.jpg" width="350px"> | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_2.jpg" width="350px"> |
+
 | Page 3 (B) | Page 6 (D) |
 | :---: | :---: |
 | **Whiz, bang, zoom! He traveled fast.** | **Its neck was long, a leafy treat.** |
 | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_3.jpg" width="350px"> | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_6.jpg" width="350px"> |
+
 | Page 7 (E) |
 | :---: |
 | **Marcel thought this dinosaur was neat.** |
 | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_7.jpg" width="350px"> |
+
 ---
 
 ## 🛠️ Technical Stack & Implementation
