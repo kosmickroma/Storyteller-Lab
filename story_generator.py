@@ -519,19 +519,19 @@ def parse_manuscript (full_text: str):
             })
     return pages
 
-# ------------------ GENERATE COVER IMAGE ------------------ #
+# ------------------ GENERATE COVER IMAGE WITH TITLE OVERLAY ------------------ #
 def generate_cover_image(client, protagonist_description: str, title: str, story_theme: str = ""):
     """
-    Generates a professional, dynamic cover image for the book.
+    Generates a professional, dynamic cover image for the book WITH TITLE TEXT OVERLAY.
     
     Args:
         client: Gemini API client
         protagonist_description: Detailed character description from Stage 1.5
-        title: Book title
+        title: Book title (will be overlaid on the image)
         story_theme: Main theme/setting of the story (e.g., "space adventure", "forest journey")
     
     Returns:
-        Generated image object
+        Generated image object with title text overlaid
     """
     
     # Check if cover is already cached
@@ -542,8 +542,6 @@ def generate_cover_image(client, protagonist_description: str, title: str, story
 
     try:
         # PROFESSIONAL COVER COMPOSITION TECHNIQUES
-        # These are used by real children's book illustrators
-        
         composition_styles = [
             "dynamic diagonal composition with character in action pose",
             "character leaping forward toward viewer with outstretched arms",
@@ -555,28 +553,63 @@ def generate_cover_image(client, protagonist_description: str, title: str, story
         import random
         composition = random.choice(composition_styles)
         
-        # BUILD: Professional cover prompt with 5 key elements:
-        # 1. Global art style
-        # 2. Cover-specific requirements  
-        # 3. Character details (from Stage 1.5)
-        # 4. Dynamic composition
-        # 5. Story theme/setting
+        # ENHANCED: Extract colors from character description (same as story pages)
+        color_keywords = []
+        desc_lower = protagonist_description.lower()
+        if 'red' in desc_lower:
+            color_keywords.append('red')
+        if 'blue' in desc_lower:
+            color_keywords.append('blue')
+        if 'orange' in desc_lower:
+            color_keywords.append('orange')
+        if 'green' in desc_lower:
+            color_keywords.append('green')
+        if 'purple' in desc_lower:
+            color_keywords.append('purple')
+        if 'yellow' in desc_lower:
+            color_keywords.append('yellow')
+        if 'white' in desc_lower:
+            color_keywords.append('white')
+        if 'black' in desc_lower:
+            color_keywords.append('black')
+        if 'gray' in desc_lower or 'grey' in desc_lower:
+            color_keywords.append('gray')
         
+        # Build color emphasis string
+        if color_keywords:
+            color_emphasis = f"MAINTAIN EXACT COLORS: {', '.join(color_keywords)} as specified in character details"
+        else:
+            color_emphasis = "maintain exact character colors as described"
+        
+        # BUILD: Professional cover prompt with character consistency
         cover_prompt = f"""
 {GLOBAL_IMAGE_STYLE}, professional children's book cover illustration, 
 
 COVER REQUIREMENTS:
-- NO text, NO letters, NO words, NO title anywhere in the image
+- ABSOLUTELY NO TEXT of any kind in the generated image
+- NO letters, NO words, NO numbers, NO symbols, NO typography
+- NO placeholder text, NO sample text, NO random characters
+- The image must be PURE ILLUSTRATION with zero text elements
+- Any text will make the image unusable
 - Book cover composition with clear focal point
-- Highly polished, more detailed than interior illustrations
-- Eye-catching and dynamic
-- Professional publishing quality
 
-CHARACTER:
+CHARACTER (MUST MATCH EXACTLY):
 {protagonist_description}
 
+{color_emphasis}
+
+Character appearance must be IDENTICAL to the description above. This is the SAME character that appears in all story illustrations.
+
 COMPOSITION:
-{composition}, exciting and inviting, character is the clear focus, expressive face showing joy and excitement
+{composition}, exciting and inviting, character is the clear focus, 
+
+CRITICAL POSITIONING FOR TEXT OVERLAY:
+- Character positioned in CENTER/MIDDLE 60% of image (vertical center)
+- Top 15% of image MUST be simple clear background (sky/space/solid color) for title text
+- Bottom 10% should be simple background for branding text
+- Character's head should NOT be in the top 15% of the image
+- Character should fill the middle area prominently
+- Leave clear empty space at very top edge for text overlay
 
 SETTING/THEME:
 {story_theme if story_theme else 'exciting adventure setting'}, vibrant and colorful background that supports but doesn't overwhelm the character, sense of wonder and adventure
@@ -585,22 +618,168 @@ MOOD:
 Joyful, adventurous, inviting, perfect for drawing in young readers, energetic and fun
         """.strip()
 
-        # Call the image generation with the enhanced prompt
+        # Call the image generation
         result = client.models.generate_images(
             model='imagen-3.0-generate-002',
             prompt=cover_prompt,
             config=dict(
                 number_of_images=1,
                 output_mime_type="image/jpeg",
-                aspect_ratio="1:1"  # Square format for book covers
+                aspect_ratio="1:1"
             )
         )
 
-        # Extract and cache the image
+        # Extract the base image
         if result.generated_images:
-            image_data = result.generated_images[0]
-            st.session_state['cover_image'] = image_data
-            return image_data
+            base_image = result.generated_images[0]
+            
+            # ADD PROFESSIONAL OUTLINED TEXT OVERLAY WITH BRANDING
+            from PIL import Image, ImageDraw, ImageFont
+            from io import BytesIO
+            
+            # Convert to PIL Image
+            img = Image.open(BytesIO(base_image.image.image_bytes))
+            draw = ImageDraw.Draw(img)
+            
+            # Image dimensions
+            width, height = img.size
+            
+            # ==================== HELPER FUNCTION: OUTLINED TEXT ==================== #
+            def draw_outlined_text(draw, position, text, font, outline_color='white', outline_width=6):
+                """
+                Draws text with thick white outline and transparent/hollow center.
+                Perfect for children's book covers!
+                """
+                x, y = position
+                
+                # Draw the outline by drawing text multiple times in a circle pattern
+                for offset_x in range(-outline_width, outline_width + 1):
+                    for offset_y in range(-outline_width, outline_width + 1):
+                        # Calculate distance from center
+                        distance = (offset_x ** 2 + offset_y ** 2) ** 0.5
+                        # Only draw if we're on the "ring" (outline only, not center)
+                        if distance <= outline_width and distance >= outline_width - 2:
+                            draw.text(
+                                (x + offset_x, y + offset_y), 
+                                text, 
+                                font=font, 
+                                fill=outline_color
+                            )
+                # Note: We do NOT fill the center - that's the "hollow" effect!
+            
+            # ==================== TITLE TEXT (BUBBLEGUM SANS - WHITE - NO BORDER) ==================== #
+            try:
+                # Start with good size for kids font
+                title_font_size = int(width * 0.10)  # 10% of image width
+                
+                # Try to load Bubblegum Sans font
+                font_paths = [
+                    "fonts/BubblegumSans-Regular.ttf",  # Local font folder (most likely)
+                    "./fonts/BubblegumSans-Regular.ttf",  # Alternative local path
+                    "BubblegumSans-Regular.ttf",  # Same directory
+                    "/usr/share/fonts/truetype/bubblegum/BubblegumSans-Regular.ttf",  # Linux
+                    "C:\\Windows\\Fonts\\BubblegumSans-Regular.ttf",  # Windows
+                ]
+                
+                title_font = None
+                for font_path in font_paths:
+                    try:
+                        title_font = ImageFont.truetype(font_path, title_font_size)
+                        break
+                    except:
+                        continue
+                
+                # Fallback if font not found
+                if title_font is None:
+                    title_font = ImageFont.load_default()
+                    
+            except:
+                title_font = ImageFont.load_default()
+            
+            # Check if title fits with SAFE MARGINS
+            max_title_width = int(width * 0.88)  # Only use 88% of width (6% margin each side)
+            bbox = draw.textbbox((0, 0), title, font=title_font)
+            text_width = bbox[2] - bbox[0]
+            
+            # If too long, reduce size gradually
+            while text_width > max_title_width and title_font_size > int(width * 0.05):
+                title_font_size = int(title_font_size * 0.9)  # Reduce by 10%
+                
+                # Reload font at smaller size
+                title_font = None
+                for font_path in font_paths:
+                    try:
+                        title_font = ImageFont.truetype(font_path, title_font_size)
+                        break
+                    except:
+                        continue
+                
+                if title_font is None:
+                    title_font = ImageFont.load_default()
+                    break
+                
+                # Re-measure
+                bbox = draw.textbbox((0, 0), title, font=title_font)
+                text_width = bbox[2] - bbox[0]
+            
+            # Position at top with proper margin
+            x = (width - text_width) // 2
+            y = int(height * 0.03)  # 3% from top
+            
+            # Draw simple drop shadow for depth (subtle)
+            shadow_offset = 3
+            draw.text((x + shadow_offset, y + shadow_offset), title, font=title_font, fill='#000000')
+            
+            # Draw main white text (clean and simple!)
+            draw.text((x, y), title, font=title_font, fill='white')
+            
+            # ==================== BRANDING TEXT (BOTTOM) ==================== #
+            try:
+                # Smaller font for copyright
+                brand_font_size = int(width * 0.04)  # 4% of image width
+                try:
+                    brand_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", brand_font_size)
+                except:
+                    try:
+                        brand_font = ImageFont.truetype("arial.ttf", brand_font_size)
+                    except:
+                        brand_font = ImageFont.load_default()
+            except:
+                brand_font = ImageFont.load_default()
+            
+            # Branding text
+            branding_text = "© Storyteller Lab"
+            
+            # Calculate position (centered at bottom)
+            bbox = draw.textbbox((0, 0), branding_text, font=brand_font)
+            brand_width = bbox[2] - bbox[0]
+            
+            brand_x = (width - brand_width) // 2
+            brand_y = int(height * 0.93)  # 7% from bottom
+            
+            # Draw branding with subtle outline for readability
+            outline_range = 2
+            for adj_x in range(-outline_range, outline_range + 1):
+                for adj_y in range(-outline_range, outline_range + 1):
+                    draw.text((brand_x + adj_x, brand_y + adj_y), branding_text, font=brand_font, fill='black')
+            
+            # Draw main branding text (white)
+            draw.text((brand_x, brand_y), branding_text, font=brand_font, fill='white')
+            
+            # ==================== SAVE AND RETURN ==================== #
+            # Convert back to bytes
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=95)
+            output.seek(0)
+            
+            # Create return object
+            class CoverImageWithTitle:
+                def __init__(self, image_bytes):
+                    self.image = type('obj', (object,), {'image_bytes': image_bytes})()
+            
+            cover_with_title = CoverImageWithTitle(output.getvalue())
+            st.session_state['cover_image'] = cover_with_title
+            return cover_with_title
 
     except Exception as e:
         error_message = str(e)
@@ -1035,7 +1214,9 @@ def main():
                         # Generate the PDF
                         with st.spinner("Creating your PDF..."):
                             # Get cover image bytes
-                            cover_bytes = st.session_state.get('cover_image').image.image_bytes if 'cover_image' in st.session_state else None
+                            cover_bytes = None
+                            if 'cover_image' in st.session_state and st.session_state['cover_image'] != 'FAILED':
+                                cover_bytes = st.session_state['cover_image'].image.image_bytes
                             
                             # Call PDF generation function
                             pdf_bytes = generate_pdf_book(
