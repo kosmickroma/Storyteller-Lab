@@ -283,6 +283,9 @@ def main():
         st.divider()
 
     # --- SESSION STATE SETUP ---
+    if 'chat_initiated' not in st.session_state:
+        st.session_state.chat_initiated = False
+
     if "gemini_chat" not in st.session_state:
         st.session_state.messages = []
         initialize_gemini_chat() 
