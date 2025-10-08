@@ -1,7 +1,7 @@
 # 📖 Storyteller Lab: AI-Powered Personalized Children's Books
 
 <p align="center">
-  <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/storyteller_lab_logo.png?raw=true" alt="Storyteller Lab Logo - A cute owl with a graduation cap on an open book" width="300"/>
+  <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/storyteller_lab_logo.png" alt="Storyteller Lab Logo - A cute owl with a graduation cap on an open book" width="300"/>
 </p>
 
 [![Powered by Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://storyteller-lab-bj2d6p4ttwm7o3gjcnd5hs.streamlit.app/)
@@ -39,8 +39,7 @@ The app generates a professional cover image and overlays the title for a finish
 
 | Cover Image |
 | :---: |
-| <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/cover.jpg" width="350px"> |
-
+| <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/cover.jpg" width="350px"> |
 ### Sample Pages (Rhyme and Consistency)
 
 The app demonstrates maintaining the character's core appearance (badger, yellow hat, blue vest, orange shorts) and the specified AABB rhyme pattern across the manuscript.
@@ -48,18 +47,15 @@ The app demonstrates maintaining the character's core appearance (badger, yellow
 | Page 1 (A) | Page 2 (A) |
 | :---: | :---: |
 | **Marcel built a machine, so grand.** | **To visit an ancient, green land.** |
-| <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/page_1.jpg" width="350px"> | <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/page_2.jpg" width="350px"> |
-
+| <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_1.jpg" width="350px"> | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_2.jpg" width="350px"> |
 | Page 3 (B) | Page 6 (D) |
 | :---: | :---: |
 | **Whiz, bang, zoom! He traveled fast.** | **Its neck was long, a leafy treat.** |
-| <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/page_3.jpg" width="350px"> | <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/page_6.jpg" width="350px"> |
-
+| <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_3.jpg" width="350px"> | <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_6.jpg" width="350px"> |
 | Page 7 (E) |
 | :---: |
 | **Marcel thought this dinosaur was neat.** |
-| <img src="https://github.com/kosmickroma/storyteller-lab/blob/main/assets/page_7.jpg" width="350px"> |
-
+| <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/page_7.jpg" width="350px"> |
 ---
 
 ## 🛠️ Technical Stack & Implementation
