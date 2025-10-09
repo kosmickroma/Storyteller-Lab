@@ -1,6 +1,7 @@
 # 📖 Storyteller Lab: AI-Powered Personalized Children's Books
 <div align="center">
 <img src="https://raw.githubusercontent.com/kosmickroma/Storyteller-Lab/main/assets/storyteller_lab_logo.png" alt="Storyteller Lab Logo" width="300"/>
+
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Streamlit-FF4B4B?style=for-the-badge)](https://storyteller-lab-bj2d6p4ttwm7o3gjcnd5hs.streamlit.app/)
 [![GitHub Stars](https://img.shields.io/github/stars/kosmickroma/Storyteller-Lab?style=for-the-badge&logo=github)](https://github.com/kosmickroma/Storyteller-Lab)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
